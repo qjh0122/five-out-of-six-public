@@ -1,6 +1,6 @@
 {
   "note": "探针台账（v129）。每个 scripts/probe-*.js 必须在这里有一条，否则 pwa/test/probe-ledger.test.js 会红。run 只有三档：ci（每次 push 都跑）/ manual（发版前跑一次）/ oneshot（一次性诊断，保留作复现脚本，不排期）。为什么要有这份清单见 docs/PROBES.md。",
-  "version": "v149",
+  "version": "v150",
   "probes": [
     {
       "file": "probe-ui-flow.js",
@@ -58,6 +58,14 @@
       "why": "v130 更正：脚本过期，但根因不是建房两步（脚本 :162 早就点了确认）——是 :169/:181/:372 直读 localStorage 老键 weile_rooms，而 v111 收口后是 lxw_rooms_v1，房间表永远读空",
       "lastVerified": "v130",
       "expect": 44
+    },
+    {
+      "file": "probe-emoji-oracle.js",
+      "what": "表情 / 短语落点的判定尺子自验：3 个正样本 + 3 个该判红的样本 + 阈值敏感度（MARGIN / 圆角 18 / 尾巴外扩改坏后结论必须翻转）+ 两轴 Q4a 口径自检",
+      "run": "manual",
+      "why": "纯 Node、不开浏览器、秒级；同一把尺子另由 pwa/test/emoji-placement-oracle.test.js 在 npm test 里每次跑",
+      "expect": 32,
+      "lastVerified": "20261114b"
     },
     {
       "file": "probe-error-report.js",

@@ -8,8 +8,12 @@
  *
  * 这里**不复制任何判据**，只把真源 spawn 出来并透传输出：
  * `run-tests.js` 的 parseCounts() 认「通过 N 项，失败 M 项」，
- * 所以这 39 项会真实计入 `npm test` 的总断言数，日志里也能看到
- * `✓ [xx/155] pwa/test/doc-consistency.test.js  39 项`。
+ * 所以真源报出的项数会**原样计入** `npm test` 的总断言数（透传，不在本层重算），
+ * 日志里形如 `✓ [xx/NNN] pwa/test/doc-consistency.test.js  K 项`。
+ *
+ * ⚠️ 这里**刻意不写死项数**（曾写「39 项」与「155 个」，真源长到 43 项后注释就成了假话）。
+ * 与 `check-docs.js` 的 [6]「快照提醒句不写死当前版本号」是同一条纪律：
+ * **数字只留在一个权威处，其余地方指向它。**
  *
  * 单独跑：`npm run docs:check`（= node scripts/check-docs.js）。
  */

@@ -1,0 +1,9 @@
+{
+  "_note": "独立昵称 oracle：来自 scripts/probe-emoji.js 的座位 fixture 配置（约第 225 行 RoomStore.joinRoom 的 nickname），不是实现输出。emoji-verdict.js --players 指向本文件。",
+  "_me": "me 的昵称是 fixture 常量（team-lead 2026-11-14 裁定：起局时显式 nickname: '我'）。它必须与产品取名逻辑无关，否则就成了「引用被测值」。若施工方最终用的不是『我』，改这一行即可，不要改工具。",
+  "me": "我",
+  "probe-pal": "陪练",
+  "probe-pal2": "陪练2",
+  "probe-pal3": "陪练3",
+  "probe-pal4": "陪练4"
+}

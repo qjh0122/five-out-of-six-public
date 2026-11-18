@@ -67,37 +67,116 @@ console.log('\n[3] --emo-k 由舞台缩放反算');
   const body = js.slice(js.indexOf('function stageScale()'));
   ok(/getComputedStyle\(st\)\.transform/.test(body.slice(0, 400)), '读的是 #stage 的 computed transform（竖版 --pt-scale、横版 --ls-scale 都落在这里）');
   ok(/matrix/.test(body.slice(0, 400)), '按 matrix 取比例（不猜变量名）');
-  ok(/Math\.max\(1,\s*stageScale\(\)\s*\/\s*0\.52\)/.test(js),
-    '★ k = max(1, 舞台缩放 / 0.52)：只放大不缩小（手机观感已逐张确认，不陪小屏继续缩）');
+  ok(/Math\.max\(1,\s*Math\.min\(1\.5,\s*stageScale\(\)\s*\/\s*0\.52\)\)/.test(js),
+    '★ k = clamp(舞台缩放 / 0.52, 1, 1.5)：只放大不缩小，且封顶（桌面不再随舞台无界放大）');
+  ok(!/Math\.max\(1,\s*stageScale\(\)\s*\/\s*0\.52\)/.test(js),
+    '★ 旧的无上限公式已消失（否则 1920 会把短语顶到 54px，是座位名的 2.25 倍）');
   ok(/setProperty\('--emo-k',\s*k\)/.test(js), '把 k 写进外层节点的 --emo-k');
 
-  /* 顺序是硬要求：offsetWidth 量的是「此刻的尺寸」，--emo-k 晚一步写进去，
+  /* 顺序是硬要求：量的是「此刻的尺寸」，--emo-k 晚一步写进去，
    * 量到的就是上一版的 64 / 50，落点跟着偏。 */
   const setAt = js.indexOf("setProperty('--emo-k'");
-  const measureAt = js.indexOf('var w = wrap.offsetWidth');
-  ok(setAt > 0 && measureAt > setAt, '★ 先写 --emo-k、后量 offsetWidth（写反了量到旧尺寸）',
+  const measureAt = js.indexOf('var sz = wrapSize();');
+  ok(setAt > 0 && measureAt > setAt, '★ 先写 --emo-k、后量尺寸（写反了量到旧尺寸）',
     'set=' + setAt + ' measure=' + measureAt);
+  /* 尺寸来源必须是**小数点**尺寸：offsetWidth/offsetHeight 是整数，
+   * 1920 档 k=2.27 时表情实际 145.27 只量到 145，规划用整数、渲染是小数，
+   * 0.27px 就让「刚好让开」变成 29px² 的重叠（Q6 实测红过）。 */
+  ok(/var r = wrap\.getBoundingClientRect\(\);/.test(js) && /r\.width \|\| wrap\.offsetWidth/.test(js),
+    '★ 尺寸用 getBoundingClientRect 的小数宽高，不用 offsetWidth（整数会在高 k 档漏 0.27px）');
+  ok(!/var w = wrap\.offsetWidth/.test(js) && !/w = wrap\.offsetWidth \|\| w/.test(js),
+    '★ 两处测量（首测 / 署名后复测）都走同一个 wrapSize()，不会一处整数一处小数');
 }
 
-console.log('\n[4] 落点贴在座位外侧，不压在座位上');
+console.log('\n[4] 落点：四方向择优 + 指向锚点的尾巴（v2 规格 §2/§3）');
 {
-  ok(/var ty = toR\.top - h - gap;/.test(js), '★ 首选：气泡底边贴座位上方留 gap');
-  ok(/if \(ty < 4\) ty = toR\.bottom \+ gap;/.test(js),
-    '★ 顶部放不下就翻到座位下方（上排座位贴着屏幕边，不翻就会被 overflow:hidden 切掉）');
-  ok(/var vw = window\.innerWidth/.test(js) && /vw - w - 4/.test(js), '水平方向夹进视口');
+  /* v1 的「底边贴座位上方 + 居中 + 夹取 + 逐头像下推」已被 v2 取代
+   * （docs/ui-emoji-placement-v2.md）。这一段随之改写 —— 断言跟着规格走，
+   * 不是跟着老代码走；真正的几何由 scripts/probe-emoji.js 的 Q0~Q8 在真浏览器量。
+   * v2.2 又改了方向顺序与 Q4 判据（规格 §2 / §9），这里同步。 */
+  ok(/function inwardDir\(/.test(js) && /seatBoxes\(null\)/.test(js),
+    '★ 方向顺序改成现场排序：内推 = 本块中心指向「全部 [data-pid] 块重心」（规格 §2 第 1 级）');
+  ok(/function availableSpace\(dir\)/.test(js) && /rest\.sort\(/.test(js) && /\[inw\]\.concat\(rest\)/.test(js),
+    '★ 其余三个方向按可用空间降序（规格 §2 第 2 级），内推永远排第一');
+  ok(!/var DIRS = \['right', 'left', 'up', 'down'\]/.test(js),
+    '★ 固定顺序「右→左→上→下」已作废（v2.2 之前就是它把上排座位逼进兜底链的）');
+  ok(/var MARGIN = 8;/.test(js), '★ 视口安全边 MARGIN = 8，且不乘 k（规格 §3）');
 
-  ok(!/translate3d\(' \+ tx \+ 'px,' \+ \(ty - 8 \* k\)/.test(js),
-    '★ 落定不再额外 -8px（那 8px 是「正中覆盖」时代的上浮量，会把 gap 抵消成负重叠）');
-  ok(!/var ty = toR\.top \+ toR\.height \/ 2 - h \/ 2;/.test(js), '★ 落点不再用「座位中心」（那正是糊住头像的写法）');
+  ok(/ab\.right \+ gap/.test(js) && /ab\.left - gap - w/.test(js),
+    '右/左：气泡边贴座位块外侧留 gap，垂直以头像中心对齐');
+  ok(/ab\.top - gap - h/.test(js) && /ab\.bottom \+ gap/.test(js),
+    '上/下：气泡底/顶边贴座位块留 gap，水平以头像中心对齐');
 
-  /* 夹取（横向进视口）+ 翻转（顶部放不下就往下）是两个独立动作，组合起来会撞车：
-   * 320 宽那一档，气泡折两行后 83 高 → 翻到座位下方，同时被夹到屏幕左边 →
-   * 正好压在左上邻居的头像上（实测 263 px²）。所以最后必须拿**最终矩形**再和
-   * 真实头像比一次，挡着谁就推到谁下面。 */
-  ok(/function coversAvatar\(y\)/.test(js), '★ 有 coversAvatar()：拿最终矩形比真实头像，算不出来的事只能量');
-  ok(/ty = low \+ gap;/.test(js), '★ 挡住谁就推到谁下面（不是只翻一次就收手）');
-  ok(/guard < 4; guard\+\+/.test(js), '推挤有次数上限（避免死循环）');
-  ok(/vh - h - 4/.test(js), '纵向也夹进视口（推挤可能把气泡推到底部外面）');
+  ok(/var loX = MARGIN \+ \(dir === 'right' \? tailLen : 0\)/.test(js)
+    && /var hiY = vh - MARGIN - \(dir === 'up' \? tailLen : 0\) - h/.test(js),
+    '★ 约束 A：裁剪盒**单侧**外扩（尾巴只朝座位那侧伸出；四边外扩在 320/390 数学不可行）');
+  ok(/hitsAny\(box, others\)/.test(js) && /overlapArea\(box, ab\) > 0/.test(js),
+    '★ 约束 B：不压任何别的座位块，也不压锚点自己（表情的末位保底除外）');
+  ok(/var tailPad = gap \+ tailLen;/.test(js) && /tipX < ab\.left - tailPad/.test(js),
+    '★ 约束 C 用 Q4b：尖端落在座位块 rect 外扩 (gap + TAIL_H) 内（规格 §6 Q4b）');
+  ok(!/var reach = avR/.test(js),
+    '★ 旧的「离头像中心 ≤ 半径 + gap + 8」判据已删（它给「下」方向设了不可能条件，规格 §9 裁定 c）');
+  ok(/var TAIL_R_DESIGN = 18;/.test(js) && /var m = Math\.min\(Math\.round\(TAIL_R_DESIGN \* k\), span \/ 2\);/.test(js)
+    && /clampNum\(base\.vert \? \(acy - top\) : \(acx - left\), m, span - m\)/.test(js),
+    '★ 尾巴沿贴合边对齐头像中心，夹在 [m, L−m]，m = min(18k, L/2)（规格 §2 约束 C 唯一出处）');
+  ok(!/TAIL_D_PAD/.test(js), '★ 旧的 tailPad = 12k 常量已删（v2.1 的 12×k / 12 两套口径都作废）');
+  ok(/hitsAny\(box, live\)/.test(js) && /var SHIFT_TRIES = 3;/.test(js),
+    '★ 约束 D：不与存活气泡相交，让位次数上限仍在（规格 §4）');
+  ok(!/needTail/.test(js) && !/window\.__tv/.test(js),
+    '★ 「尾巴放不下 → 放弃该方向」整段已删（规格 §2 约束 C：C 是夹取规则不是否决条件，'
+    + 'm ≤ L/2 恒成立 ⇒ 该否决理由在数学上不存在；它实测误杀过 390 档 41 次方向）');
+  ok(/function shiftSearch\(dir, base, opt\)/.test(js)
+    && /cands\.sort\(/.test(js) && /return d !== 0 \? d : \(a - b\);/.test(js),
+    '★ 让位改区间搜索（规格 §4.1）：穷举可行域边界，取**位移最小**的解，不再用「自身边长 + 6」粗步长');
+  ok(/var cap = \(span \/ 2 - m\) \+ acHalf;/.test(js) && /> acHalf \+ 0\.5\) continue;/.test(js),
+    '★ 位移上限由尾巴决定：尖端必须仍落在头像跨度内（气泡可以滑，尾巴不能撒谎）');
+  ok(/var reach = !\(tipX < ab\.left - tailPad/.test(js) && /reach: reach/.test(js),
+    '★ Q4b 只记录成 reach（触发兜底署名），不再否决方向（规格 §2 v2.5 / §4.3）');
+  ok(/return runPass\(\{ strictD: true, place: 'dir' \}\)/.test(js)
+    && /place: 'stack', stack: true/.test(js)
+    && /place: 'self', allowSelf: true/.test(js),
+    '★ 四轮降级：A/B/D 全满足 → 换一行 → 接受重叠 → 表情可压自己的座位');
+  ok(/if \(!spot\.reach\) \{/.test(js) && /className = 'emoji-by'/.test(js)
+    && /senderName\(ev\.from\)/.test(js),
+    '★ 兜底署名（规格 §4.3）：Q4b 不成立时加 .emoji-by，昵称按 ev.from 取');
+  ok(/p && p\.nickname \? String\(p\.nickname\) : ''/.test(js) && /return n \|\| '对方';/.test(js),
+    '★ 昵称从 state.room.players 取，取不到用「对方」（不能空着 —— 空着就是「不指人且不署名」）');
+
+  ok(/function fallbackSpot\(/.test(js), '★ 四方向全废时仍有兜底链（保证不丢内容）');
+  ok(/guard < 6; guard\+\+/.test(js) && /= low \+ gap;/.test(js),
+    '★ 兜底：逐座位块下推（躲整块，不只躲头像 —— 否则会压在别人名字上）');
+  ok(/hitsAny\(cb, live\)/.test(js),
+    '★ 兜底也要躲存活气泡（5 人同时发时，兜底那条会落在别人占住的那一行上）');
+
+  ok(/setAttribute\('data-dir', spot\.dir\)/.test(js) && /setProperty\('--tail-off'/.test(js),
+    '★ 方向写外层 data-dir、位置写 --tail-off（CSS 只负责长相，JS 只负责几何）');
+  ok(/__land = \{ left: tx, top: ty/.test(js),
+    '★ 落点矩形记在节点上：判断「会不会压住上一条」用落点，不用飞行途中的 rect');
+
+  const tail = rule('.emoji-fly::after');
+  ok(/content:/.test(tail) && /#FFFBF0/.test(tail), '尾巴 ::after 是实心三角，与气泡同色', tail.slice(0, 120));
+  ['right', 'left', 'up', 'down'].forEach((d) => {
+    const r = rule('.emoji-fly[data-dir="' + d + '"]::after');
+    ok(/clip-path:/.test(r), '★ data-dir="' + d + '" 有三角（clip-path）', r.slice(0, 140));
+  });
+  ok(/--tail-len: calc\(8px \* var\(--emo-k/.test(rule('.emoji-fly'))
+    && /--tail-w: calc\(12px \* var\(--emo-k/.test(rule('.emoji-fly')),
+    '尾巴尺寸 8×12 也乘 --emo-k（不跟着放大就会在大屏上变成一根牙签）');
+
+  ok(/filter: drop-shadow/.test(rule('.emoji-fly.is-phrase')),
+    '★ 阴影挂外层用 filter: drop-shadow（box-shadow 不会跟着三角形走，尾巴会像贴上去的）');
+  ok(!/box-shadow/.test(rule('.emoji-fly.is-phrase .emoji-pop')),
+    '★ 内层气泡不再有 box-shadow（否则矩形阴影与三角阴影各画各的）');
+
+  /* 兜底署名（规格 §4.3）：短语 0.8× 正文 + 70% 不透明度；表情 0.7× 基准字号、居中 */
+  const by = rule('.emoji-fly .emoji-by'), byEmo = rule('.emoji-fly.has-by .emoji-by');
+  ok(/font-size: calc\(19\.2px \* var\(--emo-k/.test(by) && /opacity: 0\.7/.test(by),
+    '★ 短语署名 0.8 × 正文 24 = 19.2 设计 px、70% 不透明度（规格 §4.3）', by.slice(0, 160));
+  ok(/font-size: calc\(16\.8px \* var\(--emo-k/.test(byEmo) && /text-align: center/.test(byEmo),
+    '★ 表情署名 0.7 × 基准字号 24 = 16.8 设计 px、居中（规格 §4.3）', byEmo.slice(0, 220));
+  ok(/display: flex/.test(rule('.emoji-fly.has-by')),
+    '★ 表情署名排在图的**下方**：外层从定宽改成纵向 flex，否则小字会溢出、压到邻居（Q2）',
+    rule('.emoji-fly.has-by').slice(0, 160));
 }
 
 console.log('\n[5] 起点的写法没被顺手改坏');

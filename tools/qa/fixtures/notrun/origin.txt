@@ -1,0 +1,33 @@
+sample-timeout.NOT-RUN —— 出处
+================================
+
+**这份文件不是我写的，是 `emoji-run-tier.js` 自己吐出来的。** 禁手改。
+
+生成命令（写入方提供的桩，走的是同一段 writeNotRun）：
+    node tools/qa/emoji-run-tier.js --emit-notrun-sample tools/qa/tmp-notrun
+
+然后把产物**原样** copy 到本目录（不许编辑、不许美化、不许补字段）：
+    cp tools/qa/tmp-notrun/sample-timeout.NOT-RUN tools/qa/fixtures/notrun/
+
+生成时刻：2026-11-14（本回合）
+emitter： tools/qa/emoji-run-tier.js  sha256[:16] = 90972297a7fc1835
+
+为什么要有这份文件
+------------------
+D1 的教训：本轮我方 `emoji-tier-status.js` 的原因码解析**一条真格式都读不出来**，
+而自验 19/19 全绿 —— 因为那 19 条样本全是我手抄的「我以为的格式」。
+**自验只测自己想象的格式，等于没测格式。**
+
+所以样本必须来自写入方真实产出。手抄一次也不行。
+
+什么时候要重新生成
+------------------
+下面任一情况发生 → 本文件视为过期，必须重跑写入方的桩并覆盖本文件：
+
+  1. `emoji-run-tier.js` 的第一行模板变了（不再写 `${reason} exit=${exitCode}`）
+  2. `NOT_RUN_REASONS` 名单变了（增、删、改名）
+  3. 写入方说「格式改了」
+
+前两条有自动哨：`emoji-tier-status.js --selftest` 会读写入方源码现算一遍，
+与本文件 + 我方码表对不上就判 FAIL，并打印该重跑哪条命令。
+**哨子红了不许改哨子，去重跑写入方的桩。**

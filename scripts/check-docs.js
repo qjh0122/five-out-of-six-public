@@ -109,6 +109,28 @@ head('[2] 当前状态卡片 == 代码里的真实版本');
   ok(!/\*\*当前线上[:：]/.test(before), '★★ 卡片之前没有别的「当前线上」声明（防止两个现状打架）');
 }
 
+/* =================== [2b] README 牌堆 == 代码牌堆 =================== */
+
+head('[2b] README 的牌堆张数 == 代码里的真实牌堆');
+{
+  /* 为什么单开一条：2026-11-18 全量 review 抓到 README.md:3 写「一副 53 张（52 + 大王）」，
+   * 而 createDeck() 是 54（小王 11-12 加入）。当时的守卫（上面 [2]）只守「版本 / 计数」类一致性，
+   * 没守「规则 / 牌堆」类 —— 两条数各有其主，中间那条对拍没人写，于是错了 6 天没人红。
+   * 光改文案下次还会漂，所以把它变成一条会红的断言。 */
+  const readme = read('README.md');
+  const m = /一副\s*(\d+)\s*张[（(]([^）)]*)[）)]/.exec(readme);
+  const deckLen = require(path.join(ROOT, 'pwa/js/card.js')).createDeck().length;
+  ok(!!m, '从 README 读到了「一副 N 张（…）」', m ? '' : '正则没匹配上');
+  if (m) {
+    ok(Number(m[1]) === deckLen, '★ README 牌堆张数 == createDeck().length',
+      m[1] + ' vs ' + deckLen);
+    const jokers = (m[2].match(/王/g) || []).length;
+    ok(jokers === 2, '★ README 并列写了两张王（52 + 大王 + 小王）', m[2]);
+  }
+  /* 反向：牌堆里有两张王，README 就不能一个字都不提小王 —— 只写「大王」时这条会红 */
+  ok(/小王/.test(readme), '★ README 至少提到一次小王（牌堆里有它）');
+}
+
 /* =================== [3] 生成式台账 =================== */
 head('[3] PROBES.md 头部 == 真源');
 {
@@ -141,7 +163,10 @@ head('[3b] 活文档里复述的计数 == 唯一事实源（QA 指出的最后�
   const c = card ? card[1] : '';
 
   /* 探针条数：真源是 probes.json，INDEX 只是复述 */
-  const m = /(\d+) 个真浏览器探针/.exec(index);
+  /* v2.2：台账里多了 1 条纯 Node 的判定尺子自验（probe-emoji-oracle.js），
+   * 不再是「全是真浏览器探针」—— 正则放宽为可选的「真浏览器」限定词，
+   * 判的仍是「INDEX 复述的条数 == 台账条数」。 */
+  const m = /(\d+) 个(?:真浏览器)?探针/.exec(index);
   ok(!!m && Number(m[1]) === j.probes.length,
     '★ INDEX 里的探针条数 == probes.json', m ? m[1] + ' vs ' + j.probes.length : '未找到复述');
 

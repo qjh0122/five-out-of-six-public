@@ -1,0 +1,8 @@
+timeout exit=5
+at=2026-11-14T11:51:22.695Z
+probe=deadbeefdeadbeef
+reason=样本：不是真跑，只用于验证判定器对 NOT-RUN 的识别
+duration=300s
+
+# 这一档没有可用的数据。收数前先看这一行：reason=前面的码就是原因。
+# 有 PRECONDITION-FAILED 的话，那是「跑了但没测出来」，两件事不一样。

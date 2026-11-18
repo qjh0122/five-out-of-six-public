@@ -3,11 +3,11 @@
 > **这份文件是生成的，不要手改。** 真源是 [`scripts/probes.json`](../scripts/probes.json)，
 > 改完跑 `node scripts/probes.js --write` 重生成；`npm test` 会校验两边是否一致。
 >
-> 生成于版本 `v149`，共 42 个探针。
+> 生成于版本 `v150`，共 43 个探针。
 
 ## 为什么不是「全部塞进 CI」
 
-42 个探针里只有 5 个在 CI 里。这个差距看着像欠账，但直接补齐是错的：
+43 个探针里只有 5 个在 CI 里。这个差距看着像欠账，但直接补齐是错的：
 
 | 理由 | 具体数字 |
 |---|---|
@@ -36,7 +36,7 @@
 | 档 | 条数 | 谁保证它绿 |
 |---|---:|---|
 | `ci` | 5 | 每次 push 的 GitHub Actions |
-| `manual` | 18 | 发版前 `node scripts/run-probes.js`（全量串行；耗时随条数变，不在此写死） |
+| `manual` | 19 | 发版前 `node scripts/run-probes.js`（全量串行；耗时随条数变，不在此写死） |
 | `oneshot` | 19 | 没人保证。留着是为了能复现当时的现场 |
 
 ## 全部探针
@@ -51,6 +51,7 @@
 | `probe-dev-panel.js` | ?dev=1 调试侧栏：改分数 / 造断线 / 强制结算 | oneshot | v129 | 调试面板不在玩家路径上，坏了也不影响线上；它的价值是排障时能改状态，脚本化没有收益 |
 | `probe-devices.js` | 机型矩阵：各档视口下的整体布局与字号 | oneshot | v129 | 12 档现在由 probe-ui-flow 在 CI 里全跑，这条是它之前的矩阵诊断。重复执行没有新信息 |
 | `probe-emoji.js` | 表情 / 短语：选择 → 发送 → 座位气泡 → 记录里留痕 | manual | v130 | v130 更正：脚本过期，但根因不是建房两步（脚本 :162 早就点了确认）——是 :169/:181/:372 直读 localStorage 老键 weile_rooms，而 v111 收口后是 lxw_rooms_v1，房间表永远读空 |
+| `probe-emoji-oracle.js` | 表情 / 短语落点的判定尺子自验：3 个正样本 + 3 个该判红的样本 + 阈值敏感度（MARGIN / 圆角 18 / 尾巴外扩改坏后结论必须翻转）+ 两轴 Q4a 口径自检 | manual | 20261114b | 纯 Node、不开浏览器、秒级；同一把尺子另由 pwa/test/emoji-placement-oracle.test.js 在 npm test 里每次跑 |
 | `probe-error-report.js` | 上报链路（R6 灰度）：页面异常 → POST /api/client-error → 服务端日志 | oneshot | v129 | v129 起 journey [9e] 已经在真浏览器里把这条链整段跑通并断言（capture → 服务端日志出现标记行），这条退化成它的复现脚本 |
 | `probe-first-paint.js` | 首屏第一帧：登录态未定时不许闪出错误的那一屏 | manual | v130 | 要抓的是 CSS 应用后、JS 判定登录态前的那一帧，需要真实的网络节流窗口；CI 里的机器快慢会让「那一帧」时有时无 |
 | `probe-flex-gap.js` | flex gap 兼容层在旧内核上的降级（margin 替身） | manual | v129 | 失效的只可能是特定旧内核，而本地 Windows 与 CI 的 Linux 都跑不到那个内核；验它得专门找一台老设备 |

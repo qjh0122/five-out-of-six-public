@@ -289,6 +289,10 @@
   height: calc(64px * var(--emo-k, 1));
   will-change: transform, opacity;
   transition: transform var(--dur-3) var(--ease-emph), opacity var(--dur-3) var(--ease-std);
+  /* 尾巴的两个尺寸常量（v2）。写在这里而不是 ::after 里，是因为四个方向的
+   * 规则都要用它们，而且 --emo-k 就是在这一层写的 —— 变量同源，不会有一边忘乘。 */
+  --tail-len: calc(8px * var(--emo-k, 1));
+  --tail-w: calc(12px * var(--emo-k, 1));
 }
 .emoji-fly .emoji-pop {
   width: 100%;
@@ -305,6 +309,12 @@
    * 后者专治 320 宽这一档：--emo-k 有下限 1（不跟着缩），而屏只有 320，
    * 一句 12 字的短语 325 宽就顶出去了，会被 #emoji-layer 的 overflow:hidden 切掉。 */
   max-width: min(calc(460px * var(--emo-k, 1)), calc(100vw - 24px));
+  /* ★ 阴影挂在**外层**用 filter，而不是内层气泡的 box-shadow（v2）。
+   * box-shadow 画的是「那个圆角矩形」，尾巴是 ::after 画的三角形，它不参与 ——
+   * 于是尾巴会像一块贴上去的纸，气泡本体却浮着。drop-shadow 按**渲染后的轮廓**
+   * 投影，矩形 + 三角会连成一整块，阴影拐角跟着尾巴走。
+   * 值取 design token --elev-3 的等效强度（那里面带两层，drop-shadow 只吃一层）。 */
+  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.42));
 }
 .emoji-fly.is-phrase .emoji-pop {
   padding: calc(10px * var(--emo-k, 1)) calc(18px * var(--emo-k, 1));
@@ -318,7 +328,113 @@
    * （320 宽档）。正常档位宽度足够，视觉上仍是一行 —— 但换成 overflow:hidden
    * 就会把话截断，那比折两行难看得多。 */
   white-space: normal;
-  box-shadow: var(--elev-3);
+}
+
+/* ---------- 兜底署名（v2.5 · 规格 §4.3）----------
+ *
+ * 尾巴指不过去的时候，就用文字说清是谁 —— 聊天软件三十年的标准做法。
+ * 触发条件在 JS（Q4b 不成立 = 尖端碰不到座位块）；这里只管长相。
+ * 尺寸同样乘 --emo-k，但**不动 --emo-k 的基准值**：署名就是 §4.3 里那两个
+ * 「0.8 × 正文 / 0.7 × 基准字号」，不是另立一套缩放。
+ *
+ * 为什么不用「收窄气泡」或「放宽 B」：前者拿可读性换尾巴，后者把用户投诉的
+ * 「糊住头像连名字一起挡掉」合法化（规格 §4.3 的三条否决）。 */
+.emoji-fly .emoji-by {
+  /* 短语：正文前 `昵称：` —— 0.8 × 正文 24 = 19.2 设计 px，70% 不透明度，同一行内联 */
+  font-size: calc(19.2px * var(--emo-k, 1));
+  font-weight: 600;
+  opacity: 0.7;
+}
+/* 表情：图下方一行小字，0.7 × 基准字号（24）= 16.8 设计 px，居中。
+   外层要从「定宽 64×64」改成跟着内容走 —— 否则这一行会溢出到气泡外面、
+   压到邻居的座位上（Q2 量的是气泡 rect，看不见这一行，等于判据漏了）。 */
+.emoji-fly.has-by {
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.emoji-fly.has-by .emoji-pop {
+  width: calc(64px * var(--emo-k, 1));
+  height: calc(64px * var(--emo-k, 1));
+  flex: 0 0 auto;
+}
+.emoji-fly.has-by .emoji-by {
+  margin-top: calc(2px * var(--emo-k, 1));
+  font-size: calc(16.8px * var(--emo-k, 1));
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  color: #FFFBF0;
+  /* 毡面是深绿：浅色小字直接放上去会糊，压一层细阴影保证对比 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+/* ---------- 尾巴（v2 · 规格 §3）----------
+ *
+ * 只做一件事：让气泡「指回」说话的那个人。方向由外层 data-dir 决定 ——
+ * 取值是**气泡相对座位在哪一侧**（right = 气泡在座位右边，尾巴朝左指过去），
+ * 沿贴合边的位置由 JS 写进 --tail-off（单位 px，从该边起点量到尾巴中心）。
+ *
+ * ★ --tail-off 的**原点约定**（写死在这里；探针与 oracle 都按它算尖端）：
+ *     · data-dir="right" / "left" → 从气泡**上边**（rect.top）量到尾巴**中心**
+ *     · data-dir="up"   / "down" → 从气泡**左边**（rect.left）量到尾巴**中心**
+ *   于是尖端坐标（`rect` 取**外层** .emoji-fly 的 rect —— 尾巴挂在外层，不在 pop 里）：
+ *     right → (left − len, top + off)      left → (right + len, top + off)
+ *     up    → (left + off, bottom + len)   down → (left + off, top − len)
+ *
+ * 为什么三角形用 clip-path 而不是 border 三边法：
+ *   · border 法的元素盒子恒等于「三边之和」，量出来不是三角形的尺寸；
+ *   · 探针要**量出尖端在哪**（Q4），盒子尺寸必须就是 12×8 / 8×12 这个约定，
+ *     所以这里用「宽度 = 沿气泡边的那条边、高度 = 探出去的尖」的实心矩形 + clip。
+ *
+ * 尾巴颜色与气泡同色（#FFFBF0），底边正好压在内层气泡的边缘上，看不出接缝。 */
+.emoji-fly::after {
+  content: '';
+  position: absolute;
+  background: #FFFBF0;
+  /* 层里是 pointer-events:none，这里再写一遍不吃亏：万一将来被别处引用，
+   * 一个三角不该抢走点击。 */
+  pointer-events: none;
+}
+/* 兜底落点不画尾巴（v2.7）：气泡自己带「昵称：」署名，尾巴退场。
+ * 原因见 seatSheetView.js 里 setAttribute('data-tail','off') 那段注释 ——
+ * 简言之：够不到目标时硬画，尾巴会指向另一个真实头像，那比不指更糟。 */
+.emoji-fly[data-tail="off"]::after {
+  display: none;
+}
+/* 气泡在座位右侧 → 尾巴长在气泡左边，尖端朝左 */
+.emoji-fly[data-dir="right"]::after {
+  width: var(--tail-len);
+  height: var(--tail-w);
+  left: calc(-1 * var(--tail-len));
+  top: calc(var(--tail-off, 0px) - var(--tail-w) / 2);
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+/* 气泡在座位左侧 → 尾巴长在右边，尖端朝右 */
+.emoji-fly[data-dir="left"]::after {
+  width: var(--tail-len);
+  height: var(--tail-w);
+  right: calc(-1 * var(--tail-len));
+  top: calc(var(--tail-off, 0px) - var(--tail-w) / 2);
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+}
+/* 气泡在座位上方 → 尾巴长在底边，尖端朝下（指向下面的人） */
+.emoji-fly[data-dir="up"]::after {
+  width: var(--tail-w);
+  height: var(--tail-len);
+  bottom: calc(-1 * var(--tail-len));
+  left: calc(var(--tail-off, 0px) - var(--tail-w) / 2);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+/* 气泡在座位下方 → 尾巴长在顶边，尖端朝上 */
+.emoji-fly[data-dir="down"]::after {
+  width: var(--tail-w);
+  height: var(--tail-len);
+  top: calc(-1 * var(--tail-len));
+  left: calc(var(--tail-off, 0px) - var(--tail-w) / 2);
+  clip-path: polygon(0 100%, 100% 100%, 50% 0);
 }
 /* 落下后轻轻回弹一下：让人知道「这条落在他那儿了」，而不是「飘过去消失了」。
    ★ 动画只碰内层。CSS 动画会**整个覆盖** transform，写在同一个元素上就会把

@@ -41,7 +41,7 @@
 | [`design-next-batch-v1.md`](./design-next-batch-v1.md) | **本批设计规格**（游有方）：① 离开撤销的延迟执行 + P1–P4 状态变更守卫；②「等人」判 A 销项；③ 策略引导**参数终值表 §4.2 是唯一出处**；④ 移交。含 4 条设计异议与变更单 | 2026-11-09 / 现行规格 |
 | [`qa-next-batch-v1.md`](./qa-next-batch-v1.md) | **本批验收判据**（严过关）：AC-NB-01～26 五段式、三条最容易假绿的反例、M1–M8 变异自证清单、验收档与归属表（含「写了没接进执行链」的核法） | 2026-11-09 / 现行判据 |
 | [`build-next-batch-v1.md`](./build-next-batch-v1.md) | **本批施工单**（制作人裁定，冲突时以此为准）：R1–R18 逐条裁定 + 11 行文件级改动清单 + 跳过/占位。**R17 记着「三条分屏 CSS 规则从未匹配」这条作用域错配** | 2026-11-09 / 已施工 · 待发布 |
-| [`PROBES.md`](./PROBES.md) | 探针台账：42 个真浏览器探针各守什么、归谁管（`ci` 5 / `manual` 18 / `oneshot` 19）、最近一次确认绿是什么时候。**生成式**，真源 `scripts/probes.json` + 生成器 `scripts/probes.js` | 2026-11-09 / v139 |
+| [`PROBES.md`](./PROBES.md) | 探针台账：43 个探针各守什么、归谁管（`ci` 5 / `manual` 19 / `oneshot` 19；其中 42 个是真浏览器探针，1 个是纯 Node 的落点判定尺子自验）、最近一次确认绿是什么时候。**生成式**，真源 `scripts/probes.json` + 生成器 `scripts/probes.js` | 2026-11-09 / v139 |
 | [`release-progress.md`](./release-progress.md) | 每次发布的完整记录：版本号、改动清单、验收数字。**版本现状的唯一权威** | 2026-11-08 / v138 |
 | [`compat.md`](./compat.md) | 兼容性矩阵与降级说明：哪些现代 CSS 特性丢了会怎样、老内核能用到什么程度。**v106 时的实测**，v138 未重跑；要现状就跑对应探针 | 2026-11-01 / v106 |
 | [`device-support.md`](./device-support.md) | 机型支持矩阵。「支持」的四条硬指标（组槽不溢出 / 牌面 ≥39 CSS px / 表情入口 ≥44 / 昵称 ≥10.4），三族 23 档实测。**v105 时的实测**，v138 只复跑了 6 档 `probe-ui-flow`（ALL PASS） | 2026-11-01 / v105 |
@@ -100,6 +100,7 @@
 | [`review/arch-2026-11-06.md`](./review/arch-2026-11-06.md) | v123 基线 | 架构风险与技术债评估（`server/` + `pwa/`），只读 |
 | [`review/experience-2026-11-06.md`](./review/experience-2026-11-06.md) | v123 基线 | 体验 Review：一局打完 → 再开一局（普通玩家视角，非工程师视角） |
 | [`review/qa-2026-11-06.md`](./review/qa-2026-11-06.md) | 2026-11-06 | 测试体系盲区审计：只对已知盲区做**后果定级**，不重复当新发现 |
+| [`review/2026-11-18/`](./review/2026-11-18/) | **v150 / HEAD `bedcd4f`** | **本轮全量重取（六域并行，19 维逐维重算）**。六份分域档案 + `brief.md` 共同基线单。**先读 `REVIEW.md`，这一份是取证底稿** |
 | [`best-line-spec.md`](./best-line-spec.md) | v110 已实施 | 「理论最高 vs 实际」的需求分析与口径。**顶部有实施结果表**：三处与方案不同，其中一处是实施时才发现的真 bug |
 
 **读旧 review 的四个坑**（详见 [`REVIEW.md`](./REVIEW.md) §5.1）：
@@ -117,7 +118,7 @@
 | [`../scripts/probes.json`](../scripts/probes.json) | **探针台账真源**：41 条、`version: v138`。改台账改这里，再 `npm run probes:doc` 重生成 `PROBES.md`（产物禁止手改） |
 | [`../COMMITS.md`](../COMMITS.md) | 提交信息规范（这个仓库曾经 14 条里 11 条叫 `update`）。**规范类，不含版本事实**，所以不放在「现行文档」表 |
 | [`../NOTICE.md`](../NOTICE.md) / [`../SECURITY.md`](../SECURITY.md) | 第三方声明 / 安全披露流程。**规范类，不含版本事实** |
-| [`../scripts/check-docs.js`](../scripts/check-docs.js) | **文档一致性守**：`npm run docs:check` 单跑；`pwa/test/doc-consistency.test.js` 是薄包装，让它进 `npm test` 的执行链（39 项真实计入总断言）。判据：死链 / review 档案登记 / 当前状态卡片与代码版本 / 生成式台账与真源 / 复述计数锚定 / 现行规格唯一 / 状态头已推进 |
+| [`../scripts/check-docs.js`](../scripts/check-docs.js) | **文档一致性守**：`npm run docs:check` 单跑；`pwa/test/doc-consistency.test.js` 是薄包装，让它进 `npm test` 的执行链（43 项真实计入总断言）。判据：死链 / review 档案登记 / 当前状态卡片与代码版本 / 生成式台账与真源 / 复述计数锚定 / 现行规格唯一 / 状态头已推进 / **[2b] README 的牌堆张数 == `createDeck().length`**（2026-11-18 加，两次变异已自证：54→53 与「52+大王+小王」→「52+大王」均 `EXIT=1`） |
 
 ---
 
