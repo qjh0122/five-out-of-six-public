@@ -1466,7 +1466,7 @@ async function handleRequest(req, res) {
       if (!arKeys.length) {
         return sendJson(res, 400, {
           ok: false,
-          error: '必须显式给 keys（白名单：r7 / r8 / r9 / r10 / r12）'
+          error: '必须显式给 keys（白名单：r7 / r9 / r10 / r12）'
         });
       }
       const dryRun = arBody.dryRun !== false;

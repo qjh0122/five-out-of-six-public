@@ -206,18 +206,30 @@ ok(entries.length >= 35, '★ 解析到 ≥35 条成就（防止切块正则失�
  * 七、r8 必须真的不存在了（v116 删掉的废弃字段）
  * ================================================================ */
 {
+  /* v116 的守卫原先只扫前端 achievements.js，服务端三处（重放器 DIFF_KEYS /
+   * 档案 ACH_RESETTABLE / 路由错误提示）因此漏改还全绿——本轮实证。
+   * 现在扫所有会声明计数键的源文件，命中时带相对路径，红了能直接定位。 */
+  const R8_FILES = [
+    SRC_PATH,
+    path.join(__dirname, '..', '..', 'server', 'achReplay.js'),
+    path.join(__dirname, '..', '..', 'server', 'profile.js'),
+    path.join(__dirname, '..', '..', 'server', 'index.js')
+  ];
+  const ROOT = path.join(__dirname, '..', '..');
   const r8Hits = [];
-  if (/\br8\b/.test(src)) {
+  R8_FILES.forEach(function (file) {
+    const text = fs.readFileSync(file, 'utf8');
+    if (!/\br8\b/.test(text)) return;
     /* 允许出现的地方：只有「说明它被删了」的注释 */
-    const lines = src.split('\n');
-    lines.forEach(function (ln, i) {
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+    text.split('\n').forEach(function (ln, i) {
       if (!/\br8\b/.test(ln)) return;
       const isComment = /^\s*(\*|\/\/|\/\*)/.test(ln);
-      if (!isComment) r8Hits.push((i + 1) + ': ' + ln.trim().slice(0, 60));
+      if (!isComment) r8Hits.push(rel + ':' + (i + 1) + ' ' + ln.trim().slice(0, 60));
     });
-  }
+  });
   ok(r8Hits.length === 0,
-    '★★ r8（人间清醒）已从 COUNT_KEYS / ctx / 目录里彻底删除，只在注释里留念',
+    '★★ r8（人间清醒）已从前端目录与服务端三处彻底删除，只在注释里留念',
     r8Hits.join(' | '));
 }
 

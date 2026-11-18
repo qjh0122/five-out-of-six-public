@@ -67,7 +67,7 @@ function decodeGroups(evt) {
 
 /** 只有这些键在重放里会被改；用来算 diff 时忽略 `since` / `v` 这类元数据。 */
 const DIFF_KEYS = ['vs', 'vsl', 'vsn', 's1', 's2', 'sa', 'sw', 'l1', 'l2', 'la', 'lw',
-  'smv', 'sml', 'smn', 'r7', 'r8', 'r9', 'r10', 'r12'];
+  'smv', 'sml', 'smn', 'r7', 'r9', 'r10', 'r12'];
 
 function num(v) { const n = Number(v); return isFinite(n) ? n : 0; }
 

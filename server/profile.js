@@ -146,7 +146,7 @@ function defaultSeedFile() {
  * 清掉分母，出现率与胜率一起变成 0/0，那条成就不再是「错」，而是「没了」——
  * 那种改动只能整份重放，不能定点清。白名单是这里唯一能挡住手滑的东西。
  */
-const ACH_RESETTABLE = ['r7', 'r8', 'r9', 'r10', 'r12'];
+const ACH_RESETTABLE = ['r7', 'r9', 'r10', 'r12'];
 
 class ProfileStore {
   constructor(options) {
