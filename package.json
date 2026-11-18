@@ -7,6 +7,8 @@
   "scripts": {
     "start": "node server/index.js",
     "test": "node scripts/run-tests.js",
+    "redset:check": "node scripts/check-red-set.js",
+    "redset:selftest": "node scripts/check-red-set.js --self-test",
     "journey": "node scripts/journey.js",
     "probe:devices": "node scripts/probe-devices.js --assert",
     "probe:flow": "node scripts/probe-ui-flow.js",

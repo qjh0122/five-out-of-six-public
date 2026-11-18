@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "updated": "2026-11-18 21:22:28 +0800",
+  "note": "能红集：被真实注入演示过会红的断言集合。机器只判身份唯一/前后绿红/双端哈希/集合包含；因果由人判写入每条 causal。口径见 scripts/check-red-set.js 与 docs/REVIEW.md §6.6。",
+  "records": [
+    {
+      "id": "deck-54-small-joker",
+      "assertion": {
+        "file": "pwa/test/small-joker.test.js",
+        "line": 62,
+        "name": "一副牌 54 张",
+        "hash": "f48cfe3407e94720715e951e1a9d26d604e43b4cb0c5220d6bd425569396d0c0"
+      },
+      "injection": {
+        "file": "pwa/js/card.js",
+        "line": 48,
+        "expr_old": "deck.push({ suit: 'joker', rank: SMALL_JOKER_RANK });   // 小王",
+        "expr_new": "// deck.push({ suit: 'joker', rank: SMALL_JOKER_RANK });   // 小王  ★变异注入：作弊——少推一张小王",
+        "hash": "acfa922644d38d45e91331cb2dcfabe35a78ffc008812e04d9c029850443be75"
+      },
+      "evidence": {
+        "before": {
+          "time": "2026-11-18 21:21:24 +0800",
+          "head": "cb08ba7b23f7b63431965451b015f71c4019acc3",
+          "cmd": "node pwa/test/small-joker.test.js",
+          "exit": 0,
+          "assertion_result": "PASS",
+          "output": "  PASS  pwa/test/small-joker.test.js:62:1  一副牌 54 张\n全部通过 —— 39 passed, 0 failed"
+        },
+        "after": {
+          "time": "2026-11-18 21:22:28 +0800",
+          "head": "cb08ba7b23f7b63431965451b015f71c4019acc3",
+          "cmd": "node pwa/test/small-joker.test.js（card.js:48 小王入堆行被注释后）",
+          "exit": 1,
+          "assertion_result": "FAIL",
+          "fail_count": 5,
+          "fail_loc": "pwa/test/small-joker.test.js:62:1",
+          "output": "[1] 牌堆：54 张，两张王都在\n  FAIL  pwa/test/small-joker.test.js:62:1  一副牌 54 张  -> expect 54, got 53\n  FAIL  pwa/test/small-joker.test.js:63:1  两张王  -> expect 2, got 1\n  FAIL  pwa/test/small-joker.test.js:65:1  小王 1 张  -> expect 1, got 0\n5 项失败 —— 34 passed, 5 failed"
+        }
+      },
+      "causal": "人判：注入把 card.js:48 的小王入堆行注释掉 → createDeck() 只推 52 张真牌 + 大王 = 53 张 → small-joker.test.js:62 的 eq(deck.length, 54) 直接读到 53，必红。因果链只有一跳（断言直接读 createDeck 的返回值），无第三方介入；同一次注入还令 :63（两张王）/ :65（小王 1 张）两条断言变红，三者同源，作为交叉印证而非互证。注入后已 git checkout 还原该行，复原绿（exit=0）已重跑确认。"
+    }
+  ]
+}
