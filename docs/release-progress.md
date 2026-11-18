@@ -37,7 +37,7 @@
 
 | 项 | 现在的值 | 怎么复算 |
 |---|---|---|
-| 线上版本 | `20261119a` / sw `v151` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
+| 线上版本 | `20261119b` / sw `v152` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
 | 线上核对 | **15/15 通过**（2026-11-11 指定头像版 `20261111c` 发布后实跑；版本号回读 = `20261111c`，无 JS 异常 / 无 console.error / 无 HTTP≥400 / SW 已接管 / installability 0 错） | `node scripts/probe-online-smoke.js <url>` |
 | 指定头像 | **5 人**（playerId → 文件名见 `pwa/js/avatar.js` 的 CUSTOM 表；仓库里不写昵称）。`pwa/assets/avatar-custom/` 下 5 张 128×128 webp，线上逐个 200 `image/webp`、体积与本地一致；映射键是 playerId 不是昵称。其余玩家仍走 48 款预设 | `curl -o /dev/null -w '%{http_code} %{size_download}' "<url>/assets/avatar-custom/will.webp?sharecode=<sc>"` |
 | 牌堆 | **54 张**（52 真牌 + 大王 + 小王）。小王 2026-11-12 加入，rank 14.5；两张王功能完全一样（都万能），只有「该比王的地方」大王才压小王 | `node -e "console.log(require('./pwa/js/card.js').createDeck().length)"` |
@@ -45,7 +45,7 @@
 | 成就事件日志 | **已启用**：`/api/backup/events` 回 `ok:true`；18 份档案全部冻上基线，时刻**同一个** `2026-11-11T13:20:03Z`，`20261111b` 重启后**未移动**（第一版漏了排队落盘，见十二） | `curl -H 'x-backup-key: <key>' "<url>/api/backup/events?since=0&sharecode=<sc>"` |
 | r9/r10/r12 历史错数 | **已清零且仍是 0**（9 份档案 / 27 格 + 基线 27 格；`20261111b` 发布后预演回读 `cells: 0`、`baseCells: 0`）。原值：全操 235 场却 `r12=777`、`r10=234`、`r9=271`；最大一档 `r12=801` | `npm run ach:reset -- --keys r9,r10,r12`（预演，应回 0 格） |
 | 管理后台 | 线上 `/admin.html` 可用（三页签：用户管理 / 模拟对战 / 排行榜）；真浏览器登录 **12/12**，错误密钥反向 **8 条全红**。密钥取自 `server/backup-key.txt`（gitignore，未入库），旧值备份在本机 `.workbuddy/` | `curl -H 'x-backup-key: <key>' "<url>/api/admin/users?sharecode=<sc>"` |
-| 全量回归 | **171 文件 / 7133 断言 / 0 失败**（含 `doc-consistency.test.js` 43 项、`bot-runner.test.js` 28 项、`bot-split.test.js` 11 项、`bot-hand-delta.test.js` 12 项、`admin.test.js` 59 项、`achievements-catalog.test.js` 17 项、`achievements-room-level.test.js` 19 项）。本轮 P0-2 修 README 时新增 [2b] 守 4 条，故 7129 → 7133 | `npm test` |
+| 全量回归 | **174 文件 / 7321 断言 / 0 失败**（含 `doc-consistency.test.js` 43 项、`deep` 由本轮 UI 一致性整改带来：新增 `ui-copy-consistency` 74、`interaction-consistency` 40、`button-busy-wiring` 16 三个守卫文件，`design-tokens` 27→59、`number-scale` 48→67）。较 v151 的 7140，整改共 +181 条守卫断言 | `npm test` |
 | 探针台账 | **42 条**（`ci` 5 / `manual` 18 / `oneshot` 19） | `npm run probes:check`；真源 `scripts/probes.json` |
 | 几何判定工具自验 | **10/10**（6 组已知答案样本 + 2 个采集器合规），M8 变异下退出码 1 | `npm run qa:geom` |
 | CSS 规模 | 6888 行（style 5645 / records 1243） | `wc -l pwa/css/style.css pwa/css/records.css` |
@@ -5530,3 +5530,41 @@ v149 的规则是「上方放不下 → 翻到下方 → 水平居中后夹进�
    **不要写「未覆盖高 DPI」** —— `deviceScaleFactor: 2` 一直开着。
 3. 120 格几何没有一格是真人点出来的，全部由探针经 CDP 注入事件后测量；「六档全绿」证明**没崩、几何对**，
    不证明**顺手、能玩**。真人路径（`e9-emoji-realperson.js`，真鼠标、零页面注入）是另一份证据，替不了它，也不被它替。
+
+---
+
+## v152 · UI 一致性整改：从「有规范」到「规范覆盖到」（版本 `20261119b` / sw `v152`，2026-11-19）
+
+> 起因：用户要求「从最专业的美工和前端设计角度审核整个项目」的交互 / 按钮 / 文字一致性。
+> 三域独立审查（视觉 / 交互 / 文案）→ 21 项真问题（P0×8 + P1×13）→ 主程序分 P0/P1 两批修复 → QA 独立验收通过（22/22）。
+> 审查报告：`ui-consistency-audit-2026-11-19.md` + `ui-audit-{art,interaction,copy}-2026-11-19.md`；实施日志 `p0-fix-log.md` / `p1-fix-log.md`；验收 `qa-ui-consistency.md`。
+
+**验收（不是只跑绿灯）**
+- 全量：**174 文件 / 7321 断言 / 0 失败**（较 v151 的 7140 净增 181 条守卫断言，全部参与过变异自证）。
+- 每条新增守卫都做过「注入问题 → 红 → 还原 → 绿」，含 QA 独立复现的 6 次逐字节 SHA-256 还原。
+- 真浏览器 `probe-ui-flow`：iOS 竖 390×844 与横 844×390 各 13 屏 **ALL PASS**，无出界/溢出/遮挡/硬热区；半行硬切 2 条、软热区 20 条与整改前一致，未引入新硬缺陷。
+
+**P0 八项**（每局可感知）
+1. 结算冠军净胜同屏两套答案（30px 金 vs 48px 涨跌）→ 统一走 `--num-2` + 涨跌三态，层级与名次表一致。
+2. 「本局过程」按钮打开「本场过程」弹窗 → 标题统一「本局过程」。
+3. `--text-main` 4 引用 0 定义（颜色靠继承偶然）→ `:root` 定义 `#f5f0e6` + `var()` 引用完整性断言。
+4. 9 处裸外投影藏在组合声明第 2/3 层（含 1 处 JS 内联）→ 就近收敛到 `--elev-*`，`isElevation()` 改逐层判定 + 3 条带色氛围光显式豁免。
+5. 量词「场/局/把」漂移 → 契约「把=单次发牌 / 局=一整场」，全站统一。
+6. 禁用词「操作失败/网络异常」等直达玩家 → 按规格改说清后果+动词的文案，全域清零。
+7. 净胜/净得分裂 → 统一「净胜」。
+8. `btn-hold`「等人」在按钮体系外（pressBusy 三态静默失效）→ 进 `.btn` 体系 + 守卫。
+
+**P1 十三项**（明显不一致）
+- 视觉：结算页文字层 9 档 → `--fs-1..4` 阶梯；圆角 21 档 → `--r-chip/card/modal/pill` 四档（13 个既成几何形状具名豁免 + 僵尸检查）。
+- 交互：确认框加 `tone:'danger'`（删号才用，`secret:true` 必带 danger 守卫）；删号密码框补 Enter；昵称框 placeholder 加「（回车创建房间）」；忙碌态统一（确认键补 `is-busy`、两个加载环收敛 `--spin-period: 800ms`）；结算页 3 颗次级按钮裸 `.btn` → `btn-quiet`；`onHoldNext` 补 `if(!restore)return`。
+- 文案：战绩/记录统一「战绩」（本机副本文案同步 `design-states-v2` D10）；开局四动词统一；「出了点问题/稍后再试」改具体后果+动词；AI 三叫法统一；成就中文数字→阿拉伯；`aria-label` 用字修正。
+
+**审查后补漏（QA 盲区实证）**
+- D-1：量词守卫此前只钉静态与一个运行时节点，改回「场」仍绿 → 扫描器改为「量词位终点字」判定，8 个运行时节点逐个变异全红。
+- D-2：`roomStore` 的「请求超时/连接超时/连接失败/无法建立连接」裸技术短语直达玩家 → 统一改为「没连上服务器，这步没送到；房间没变化，再点一次」，并纳入禁用词扫描。
+- D-6：`design-states-v2.md` 新增 D10 改判登记（v1 封存件按纪律不改）。
+
+**未覆盖（发布说明别省）**
+- 未做「真人玩一局」的手感验证：操作响应、消除时机、U4 改的 pressBusy 控制流「连点等人是否卡忙碌态」、断网 toast，均需真人复验。
+- 旁听卡字号（`.sp-title` 40 / `.sp-tip` 26）与 13 个圆角几何项按「观感明显变化不硬压」保守保留，需真机截图才能判能否并档。
+- 半行硬切 2 条（结算 91% / 规则 82%）是既有的滚动容器行为，本轮未动。

@@ -1,5 +1,5 @@
 /**
- * 战绩页的「含人机」口径（前端侧）
+ * 战绩页的「含 AI」口径（前端侧）
  * 跑法：node pwa/test/records-ai.test.js
  *
  * 服务端的口径已经由 server/test/ai-records.test.js 锁死（人机局不进 recent、
@@ -8,8 +8,8 @@
  *   1. 本机兜底数据层（records.js）也必须同口径。
  *      离线 / ?mode=local 时战绩页读的是 localStorage，如果那里不排除 ai 行，
  *      同一个账号在线上和离线会看到两套数字 —— 那是最难解释的一种 bug。
- *   2. 界面要**看得出**哪一场含人机，并在合适的位置说清它不算数。
- *      用户原话是「不计入战绩和排行榜…但在我的战绩页面上表示出含人机对战」，
+ *   2. 界面要**看得出**哪一场含 AI，并在合适的位置说清它不算数。
+ *      用户原话是「不计入战绩和排行榜…但在我的战绩页面上表示出含 AI对战」，
  *      所以「不算」和「要显示」必须同时成立，不能藏。
  */
 'use strict';
@@ -123,9 +123,9 @@ eq(Records.all('pa').length, 2, '★ 但列表里有 2 行 —— 不能让「�
 console.log('\n[4] 界面结构：说明 + 徽标 + 结算提示都在');
 ok(html.indexOf('id="rp-ai-note"') >= 0, '战绩页有 #rp-ai-note 说明行');
 ok(/id="rp-ai-note"[^>]*class="[^"]*\bhidden\b/.test(html), '#rp-ai-note 默认隐藏（没有 AI 局时不占位）');
-ok(html.indexOf('class="rp-ai-chip"') >= 0, '说明行里有一枚「含人机」徽标（视觉上与行内徽标同形）');
+ok(html.indexOf('class="rp-ai-chip"') >= 0, '说明行里有一枚「含 AI」徽标（视觉上与行内徽标同形）');
 ok(/id="rp-ai-note-text"/.test(html), '说明文案是独立节点（js 要往里写局数）');
-ok(/<span class="rp-ai-chip">含人机<\/span>/.test(html), '徽标文案就是「含人机」三个字');
+ok(/<span class="rp-ai-chip">含 AI<\/span>/.test(html), '徽标文案就是「含 AI」三个字');
 
 /* 说明放在列表标题下面，而不是页脚：它解释的是下面这几行 */
 const iHead = html.indexOf('rp-list-head');
@@ -133,7 +133,7 @@ const iNote = html.indexOf('id="rp-ai-note"');
 const iList = html.indexOf('id="records-list"');
 ok(iHead >= 0 && iNote > iHead && iList > iNote, '★ 位置：列表标题 → 人机说明 → 列表（解释的是下面这几行）');
 
-ok(gameJs.indexOf("el('span', 'rp-row-ai', '含人机')") >= 0, '行内徽标由 renderRecordRows 生成');
+ok(gameJs.indexOf("el('span', 'rp-row-ai', '含 AI')") >= 0, '行内徽标由 renderRecordRows 生成');
 ok(gameJs.indexOf("li.classList.add('is-ai')") >= 0, '人机行加 .is-ai（整行降一档亮度）');
 ok(/\.rp-row\.is-ai/.test(recCss), '样式里有 .rp-row.is-ai');
 ok(/\.rp-ai-chip,\s*\n?\s*\.rp-row-ai\s*\{/.test(recCss), '说明徽标与行内徽标共用一套样式（同形 = 一看就懂）');
@@ -166,9 +166,9 @@ ok(/var hasData = st\.games > 0 \|\| rows\.length > 0/.test(gameJs),
   '★ hasData 把「只有人机局」也算有数据（否则空态文案会和列表打架）');
 
 /* 排行榜页脚必须写清口径，否则「我打了几十场怎么榜上没有我」无从解释。
- * 用户 2026-10-30 的原话是「排行榜要加说明 说明不含人机即可」——
- * 所以这里守的是「不含人机」这四个字，不是「仅统计对人类局」这种委婉说法。 */
-ok(/不含人机对局/.test(html), '★ 排行榜页脚写明「不含人机对局」');
+ * 用户 2026-10-30 的原话是「排行榜要加说明 说明不含 AI即可」——
+ * 所以这里守的是「不含 AI」这四个字，不是「仅统计对人类局」这种委婉说法。 */
+ok(/不含 AI 对局/.test(html), '★ 排行榜页脚写明「不含 AI 对局」');
 
 /* ========================================================================== */
 console.log('\n========================================');

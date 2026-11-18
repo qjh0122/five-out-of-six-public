@@ -170,7 +170,7 @@ console.log('\n[6] 样式');
   ok(/\.settle-rank\.is-gone \{/.test(css), '弃局者头像圈换成中性色（金色 = 冠军/名次）');
   ok(/\.settle-pos\.is-out \{/.test(css), '「—」角标有自己的底色');
   ok(/\.settle-pos\.is-tie::before \{ content: '='/.test(css), '并列角标用「=」前缀');
-  ok(/\.settle-tie \{[^}]*border-radius: 999px/.test(css), '「并列」胶囊与「我」胶囊同一套圆角');
+  ok(/\.settle-tie \{[^}]*border-radius: var\(--r-pill\)/.test(css), '「并列」胶囊与「我」胶囊同一套圆角');
 }
 
 console.log('\n————————————————————————————');

@@ -386,7 +386,7 @@
     } catch (_) { /* silence: 上报自身绝不能再抛 */ }
     /* 控制台也留一份：本地复现时不用去翻服务端日志 */
     try { if (typeof console !== 'undefined' && console.error) console.error('[lxw]', where, e); } catch (_) { /* silence: 没有 console 的环境（极老 WebView），本来就没地方打日志 */ }
-    if (userMsg !== null) flash(userMsg || '出了点问题，已经记下了');
+    if (userMsg !== null) flash(userMsg || '刚才那步没走完，是否已经生效还看不出来；错误已经记下了，回房间看一眼再定');
   }
 
   /* 收起还没到时间的 toast。目前只有一处用：爆点拦截框弹出来的时候。
@@ -408,7 +408,7 @@
 
   /* 统一的房间操作失败处理：身份没了就回登录页，其余照旧 toast + 错误音 */
   function flashRoomError(res) {
-    var msg = (res && res.error) || '操作失败';
+    var msg = (res && res.error) || '这步没成功，房间没变化，再点一次';
     if (authFatalMsg(msg)) { gotoAuth(msg); return true; }
     flash(msg);
     Sfx.play('error');
@@ -739,11 +739,11 @@
         hint.appendChild(el('span', 'hold-left', holdLeftText(room)));
       }
     } else if (act.length < CONFIG.MIN_PLAYERS) {
-      hint.textContent = '还差 ' + (CONFIG.MIN_PLAYERS - act.length) + ' 人才能开局，可以点「补 AI 队友」一个人先玩';
+      hint.textContent = '还差 ' + (CONFIG.MIN_PLAYERS - act.length) + ' 人才能开局，可以点「补 AI」一个人先玩';
     } else if (!allReady) {
       hint.textContent = '等待所有玩家准备…';
     } else {
-      hint.textContent = '全部准备好，马上开始';
+      hint.textContent = '全部准备好，马上开局';
       hint.classList.add('ready');
     }
 
@@ -1003,7 +1003,7 @@
     if (state.room.ownerId !== state.myId) { flash('只有房主能改把数'); return; }
     try {
       var res = await RoomStore.setHandLimit(state.roomId, state.myId, n);
-      if (!res || !res.ok) { flash((res && res.error) || '改不了，稍后再试'); return; }
+      if (!res || !res.ok) { flash((res && res.error) || '把数没改上，下一局还是原来的把数；回结算页再点一次档位'); return; }
       /* 不手工重绘：改完服务端会广播，订阅回调把结算页整块重画。
        * 手工再画一遍只会和广播抢，画出两份不一样的按钮状态。 */
       flash('下一局打 ' + n + ' 把');
@@ -1024,7 +1024,7 @@
       + '名次和分数都留着，这把打完还能一起打。',
       async function () {
         var res = await RoomStore.dropNext(state.roomId, state.myId, targetId);
-        if (!res || !res.ok) { flash((res && res.error) || '操作失败'); Sfx.play('error'); return; }
+        if (!res || !res.ok) { flash((res && res.error) || '这步没成功，房间没变化，再点一次'); Sfx.play('error'); return; }
       });
   }
 
@@ -2266,7 +2266,7 @@
     try {
       var res = await RoomStore.beginRevise(room.roomId, state.myId);
       if (!res || !res.ok) {
-        flash((res && res.error) || '进不了修改，稍后再试');
+        flash((res && res.error) || '还没进到修改态，这一轮照原样提交；回房间再点一次「改一下」');
         Sfx.play('error');
         return;
       }
@@ -2303,7 +2303,7 @@
     try {
       var res = await RoomStore.cancelRevise(room.roomId, state.myId);
       if (!res || !res.ok) {
-        flash((res && res.error) || '撤回不了，稍后再试');
+        flash((res && res.error) || '撤回没成功，刚才的修改还留着；回房间再点一次');
         Sfx.play('error');
         return;
       }
@@ -2893,7 +2893,7 @@
     } catch (e) {
       /* 交牌这一处最不能推给网络：牌很可能已经进服务端了（异常出在后面的 render），
        * 说「再提交一次」会让他撞「本轮已提交」，然后一直怀疑网络。 */
-      reportBug('submitGroups', e, '交牌出了点问题，已经记下了');
+      reportBug('submitGroups', e, '交牌后的收尾出了错，牌可能已经交上去了；错误已经记下了，先回房间看一眼，别急着重交');
       Sfx.play('error');
     } finally {
       /* 顺序不能反：pressBusy 的 restore() 会把 disabled 打回「点下去那一刻的值」。
@@ -3078,7 +3078,18 @@
   var confirmBusyText = '处理中…';
 
   function askConfirm(title, desc, onOk, opts) {
-    $('#confirm-title').textContent = title;
+    /* P2 · 严重度分级：这个框同时承载「每把都点的提交」和「删号」。
+     * 以前确定键永远是 btn-primary，真正区分危险的只剩一个密码框 ——
+     * 玩家学会的「一路点确定」习惯正好在最重要的一次生效。
+     * danger 时把最后一道确认也换成实心危险键，并在标题写明不可撤销。 */
+    var danger = !!(opts && opts.tone === 'danger');
+    var titleEl = $('#confirm-title');
+    if (titleEl) titleEl.textContent = title + (danger ? '（不可撤销）' : '');
+    var okBtn = $('#btn-confirm-ok');
+    if (okBtn) {
+      okBtn.classList.toggle('btn-danger', danger);
+      okBtn.classList.toggle('btn-primary', !danger);
+    }
     $('#confirm-desc').textContent = desc;
     confirmOnOk = onOk;
     confirmBusyText = (opts && opts.busyText) || '处理中…';
@@ -3093,6 +3104,16 @@
        * 不需要密码时去掉它，焦点回到「取消」—— 这个框里可能挂着删号，别让回车落在「确定」上。 */
       if (confirmNeedSecret) sec.setAttribute('data-autofocus', '');
       else sec.removeAttribute('data-autofocus');
+      /* P3 · 删号密码框补 Enter：其余 5 个输入框（rename / auth-pass / pwd-new /
+       * room-input / nickname-input）都已经是「输完回车就走」，只有这里是例外。
+       * onConfirmOk 自带 confirmBusy 连点闸与空密码拦截，不需要额外防重复。 */
+      if (confirmNeedSecret) {
+        sec.onkeydown = function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); onConfirmOk(); }
+        };
+      } else {
+        sec.onkeydown = null;
+      }
       if (confirmNeedSecret) setTimeout(function () { try { sec.focus(); } catch (e) {} }, 30);
     }
     showModalEl('confirm-modal');
@@ -3121,14 +3142,16 @@
     }
     confirmBusy = true;
     var oldText = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = confirmBusyText; }
+    /* P5 · 和全站 pressBusy 同一套视觉：只 disabled + 换文字时，
+     * 删号「删除中…」那几秒没有转圈，和别的按钮读不出是同一种状态。 */
+    if (btn) { btn.disabled = true; btn.classList.add('is-busy'); btn.textContent = confirmBusyText; }
     try {
       await fn(secret);
     } catch (e) {
       /* 回调自己已经 toast 过；这里只保证弹窗不会卡在「处理中」 */
     } finally {
       confirmBusy = false;
-      if (btn) { btn.disabled = false; btn.textContent = oldText; }
+      if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = oldText; }
       closeConfirm();
     }
   }
@@ -3516,7 +3539,7 @@
     } catch (e) {
       /* 建房是**唯一**会把网络失败原样抛上来的协议调用（ws.createRoom 没有 .catch），
        * 所以这一句说「检查网络」是实话。但也要上报：建不起来时服务端毫无感知。 */
-      reportBug('createRoom', e, (e && e.message) || '创建失败，检查一下网络', 'net');
+      reportBug('createRoom', e, (e && e.message) || '房间没建成，还没开始计分；回首页重新点「创建房间」', 'net');
       Sfx.play('error');
     } finally {
       restore();
@@ -3539,7 +3562,7 @@
     } catch (e) {
       /* 进房相反：ws.joinRoom 已经把拒绝转成 {ok:false,error} 了，
        * 能抛到这里的只有本端把自己绊倒 —— 别再说「检查网络」。 */
-      reportBug('joinRoom', e, '进房出了点问题，已经记下了');
+      reportBug('joinRoom', e, '进房没成功，你还在原来那屏；错误已经记下了，回首页重新点「加入房间」');
       Sfx.play('error');
     } finally {
       restore();
@@ -3566,7 +3589,7 @@
         /* 「新的一局已经开始了」不是故障，是时序 —— 别人比我先点完。
          * 用 toast 说清就行，不弹红色报错：玩家没做错任何事，
          * 而且他还能继续看自己的结算数据与回放。 */
-        flash(res.error || '暂时进不去，稍后再试');
+        flash(res.error || '这一局已经开了，进不去；回房间看当前这一局');
       }
     } catch (e) {
       reportBug('wantNext', e);
@@ -3590,7 +3613,7 @@
     }
   }
 
-  /* 房主补一个 AI 队友：凑不齐人时也能马上开一局 */
+  /* 房主补一个 AI：凑不齐人时也能马上开一局 */
   async function onAddBot() {
     if (!state.room) return;
     if (blockedOffline()) return;
@@ -3638,7 +3661,7 @@
     if (!restore) return;
     try {
       var res = await RoomStore.dropNext(state.roomId, state.myId, state.myId);
-      if (!res || !res.ok) { flash((res && res.error) || '操作失败'); return; }
+      if (!res || !res.ok) { flash((res && res.error) || '这步没成功，房间没变化，再点一次'); return; }
       flash('这一把你不打。他们开了你在旁边看，随时点「开始下一局」回来');
     } catch (e) {
       reportBug('dropNext', e);
@@ -3656,10 +3679,14 @@
     if (blockedOffline()) return;
     var btn = document.querySelector('[data-hold-next]') || $('#btn-hold-off');
     var restore = btn ? pressBusy(btn, on ? '挂起中…' : '开牌中…') : function () {};
+    /* U4：和其余 12 处写法一致。pressBusy 若因已在途返回 null，
+     * 下面 finally 的 restore() 会 TypeError —— 正常二次点击被 disabled 挡住，
+     * 但「弹窗委托 + 广播重绘」路径能绕过，缺的正是这一行防御。 */
+    if (!restore) return;
     try {
       var res = await RoomStore.holdNext(state.roomId, state.myId, !!on);
-      if (!res || !res.ok) { flash((res && res.error) || '操作失败'); return; }
-      flash(on ? '已挂起：朋友进来之前不会开牌（最多等 3 分钟）' : '已放行，人齐就开牌');
+      if (!res || !res.ok) { flash((res && res.error) || '这步没成功，房间没变化，再点一次'); return; }
+      flash(on ? '已挂起：朋友进来之前不会开牌（最多等 3 分钟）' : '已放行，人齐就开局');
     } catch (e) {
       reportBug('holdNext', e);
     } finally {
@@ -3679,7 +3706,7 @@
       if (!res.ok) {
         /* 撞上「新的一局已经开始了」不是故障：别人刚好凑齐并开了局。
          * 这时把他留在房间页只会看到一个已经不属于他的界面，直接刷新到当前真实状态。 */
-        flash(res.error || '撤回不了，稍后再试');
+        flash(res.error || '撤回没成功，刚才的修改还留着；回房间再点一次');
       }
     } catch (e) {
       reportBug('unWantNext', e);
@@ -4936,7 +4963,7 @@
       if ($('#ach-scroll')) $('#ach-scroll').scrollTop = 0;
     }).catch(function () {
       if (state.screen !== 'achievements') return;
-      $('#ach-body').innerHTML = '<p class="rank-tip">网络异常，稍后再试。</p>';
+      $('#ach-body').innerHTML = '<p class="rank-tip">成就列表没读上来，回首页再点一次「成就」重读。</p>';
     });
   }
 

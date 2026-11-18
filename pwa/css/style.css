@@ -25,6 +25,10 @@
   --up-red: #FF5D5D;
   --down-green: #3DDC84;
   --warm-white: #FFF7E8;
+  /* 深底上的主文字。此前 4 处 `var(--text-main)` 全无定义、静默回退到 body 的
+   * `color:#f5f0e6`（:126），只是碰巧可读；祖先一改色它们会跟着变且无测试报警。
+   * 值取现网实际继承色，与 --warm-white（纸面暖白）刻意不同。 */
+  --text-main: #f5f0e6;
   --gray-aux: #B8C0CC;
   --danger-ghost: #FF9B9B;   /* 危险幽灵按钮字（清除战绩），比 --up-red 深一档更耐读 */
   --ink: #1A1D23;
@@ -71,6 +75,9 @@
    *   emph 末端带一点回弹，只给「东西出现」用（弹窗、徽章、新牌）           */
   --ease-std: cubic-bezier(0, 0, 0.2, 1);
   --ease-emph: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* P5：按钮转圈与战绩页加载环是同一个「正在处理」，以前一个 0.7s 一个 900ms，
+   * 串起来读成两套系统。取中间值 800ms，两处都引用这一档。 */
+  --spin-period: 800ms;
 
   /* ── 数：四档显示字号 + 两档单位（v138）──────────────────────────
    * 以前同一个「数」在四个地方用四个字号：净值 40（榜单）/ 40（战绩列表）/
@@ -92,6 +99,29 @@
   --num-4: 24px;
   --num-u1: 28px;
   --num-u2: 20px;
+
+  /* ── 文：文字层阶梯（P1-P6）───────────────────────────────────
+   * 数值有 --num-* 六档并已封闭；但承载数字的**说明文字**（结算页同屏曾出现
+   * 16/20/22/24/28/30/32/40 九档）没有梯子，于是 22/30 这类"比 20 大一点、
+   * 比 32 小一点"的现编值一屏四个。文字层锁死这四档，取值刻意复用 numeric
+   * 的中间四档（32/28/24/20），但语义分开：写文字的引用 --fs-*，写数的引用
+   * --num-*，任一侧要调档不会误伤另一侧。
+   * 和 --dur-*/--ease-* 同一条纪律：**想加档先改文档，不许在 CSS 里现编**。 */
+  --fs-1: var(--num-3);    /* 32px 文字层最大（旁听标题一档） */
+  --fs-2: var(--num-u1);   /* 28px 文字层强调 */
+  --fs-3: var(--num-4);    /* 24px 文字层正文 */
+  --fs-4: var(--num-u2);   /* 20px 文字层辅助说明 */
+
+  /* ── 圆：一条形状语言，四档（P1-P7）───────────────────────────
+   * 此前 21 个 border-radius 值、0 个 token，11/12、14/16、18/20、26/28
+   * 是 1~2px 的近重复漂移（逐屏补丁的指纹）。口径按"这是什么形状"分，
+   * 不按"哪个屏幕"分：chip=小块、card=内容卡、modal=弹窗、pill=胶囊全圆。
+   * 50%（圆形)/ inherit（继承父形状）/ 0（直角）是几何原语，不算档。
+   * 想加档先改文档，别在组件里现编一个 17px。 */
+  --r-chip: 12px;
+  --r-card: 16px;
+  --r-modal: 24px;
+  --r-pill: 999px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -383,7 +413,7 @@ html.no-session #screen-auth { display: flex !important; }
   left: 20px;
   inset: 20px;
   border: 1px solid rgba(245, 193, 92, 0.22);
-  border-radius: 16px;
+  border-radius: var(--r-card);
   pointer-events: none;
   z-index: 0;
 }
@@ -415,7 +445,7 @@ html.no-session #screen-auth { display: flex !important; }
 .ribbon-title {
   display: inline-block;
   padding: 10px 40px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 40px;
   font-weight: 800;
   letter-spacing: 2px;
@@ -441,9 +471,11 @@ html.no-session #screen-auth { display: flex !important; }
   font-size: 32px;
   font-weight: 700;
   color: #fff;
-  /* 兜底底色：`.btn` 原样不写 background，裸用（首页「加入房间」就是 `class="btn btn-lg"`）
-   * 会落到浏览器默认的 #F0F0F0 灰底，配上这里的白字 = 对比度约 1.1:1，**等于看不见**。
-   * 任何按钮要么带变体类，要么至少拿这个半透明白底，绝不允许落到 UA 默认值。 */
+  /* 兜底底色：`.btn` 裸用会落到浏览器默认的 #F0F0F0 灰底，配上这里的白字
+   * = 对比度约 1.1:1，**等于看不见**。所以每个按钮都要带一个变体类
+   * （primary / secondary / quiet / ghost / danger）；下面这层半透明白底
+   * 只是最后一道保险，不再是"可以裸用"的许可。
+   * 首页「加入房间」现在是 `class="btn btn-quiet btn-lg"`（曾裸用 btn btn-lg）。 */
   background: rgba(255, 255, 255, 0.14);
   cursor: pointer;
   position: relative;
@@ -475,7 +507,7 @@ html.no-session #screen-auth { display: flex !important; }
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.35);
   border-top-color: #fff;
-  animation: btnSpin 0.7s linear infinite;
+  animation: btnSpin var(--spin-period) linear infinite;
 }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 
@@ -552,14 +584,14 @@ html.no-session #screen-auth { display: flex !important; }
   min-height: max(72px, var(--tap-min, 72px));
   padding: 0 24px;
   font-size: 24px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
 }
 .btn-lg { width: 100%; max-width: 560px; margin: 8px 0; }
 .btn-sm {
   min-height: var(--tap-min, 88px);
   padding: 0 28px;
   font-size: 28px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   flex-shrink: 0;
 }
 
@@ -588,7 +620,7 @@ input {
   padding: 0 30px;
   font-size: 28px;
   border: 2px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.10);
   color: #fff;
   outline: none;
@@ -636,7 +668,7 @@ input:focus {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
     rgba(8, 26, 21, 0.50);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 18px rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), var(--elev-1);
   font-family: inherit;
   color: var(--entry-tint);
   cursor: pointer;
@@ -680,7 +712,7 @@ input:focus {
   background: url('../assets/card_back.webp') center / cover no-repeat;
   opacity: 0.16;
   pointer-events: none;
-  border-radius: 16px;
+  border-radius: var(--r-card);
 }
 .home-deco.deco-a { top: 120px; left: 24px; transform: rotate(-12deg); }
 .home-deco.deco-b { bottom: 470px; right: 18px; transform: rotate(12deg); }
@@ -852,7 +884,7 @@ input:focus {
   font-size: 20px;
   color: var(--gray-aux);
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 2px 12px;
 }
 .player-status.ready {
@@ -895,7 +927,7 @@ input:focus {
   color: var(--gray-aux);
   margin: 10px 0;
   background: rgba(0, 0, 0, 0.24);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 8px 24px;
   text-align: center;
 }
@@ -918,7 +950,7 @@ input:focus {
 .room-prev {
   margin: 0;
   padding: 0 26px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 24px;
 }
 @keyframes breathe {
@@ -967,12 +999,12 @@ input:focus {
   width: 100%;
   max-width: 620px;
   padding: 26px 30px 22px;
-  border-radius: 26px;
+  border-radius: 28px;
   border: 1px solid rgba(245, 193, 92, 0.28);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02)),
     rgba(6, 22, 17, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), var(--elev-3);
 }
 .tr-card-head {
   display: flex;
@@ -1006,7 +1038,7 @@ input:focus {
   margin-top: 12px;
   padding: 12px 8px;
   border: 1px dashed rgba(245, 193, 92, 0.45);
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   background: transparent;
   color: var(--gold);
   font-size: 24px;
@@ -1053,7 +1085,7 @@ input:focus {
   z-index: 1;
   margin-bottom: 12px;
   padding: 10px 16px 8px;
-  border-radius: 24px;
+  border-radius: var(--r-modal);
   border: 1px solid rgba(255, 255, 255, 0.10);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.028)),
@@ -1074,7 +1106,7 @@ input:focus {
  * 整块不会左右抖，否则每秒抖一下，比不显示还烦。 */
 .gt-timer {
   padding: 1px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
@@ -1187,7 +1219,7 @@ input:focus {
   align-items: center;
   gap: 7px;
   padding: 4px 12px 4px 4px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(0, 0, 0, 0.22);
 }
@@ -1303,7 +1335,7 @@ input:focus {
   box-shadow:
     inset 0 3px 30px rgba(0, 0, 0, 0.52),
     inset 0 -18px 44px rgba(0, 0, 0, 0.30),
-    0 18px 46px rgba(0, 0, 0, 0.34);
+    var(--elev-3);
   pointer-events: none;
 }
 /* 座位层：不再是「可横滑的座位条」，而是一块定位容器。
@@ -1366,7 +1398,7 @@ input:focus {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(4, 30, 18, 0.55);
   border: 1px solid rgba(245, 193, 92, 0.30);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -1520,7 +1552,7 @@ input:focus {
   justify-content: center;
   gap: 6px;
   padding: 8px 18px 6px 16px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   /* 桌带不用方框：只留左侧一条组色竖条，空出来的那半边就是毡面本身。
    * 之前是 670 宽的圆角方框 + 边框 + 深色底，牌只占左边一小块，看起来像「一个空盒子」。 */
   border-left: 4px solid var(--slot-color);
@@ -1562,7 +1594,7 @@ input:focus {
   font-variant-numeric: tabular-nums;
   color: var(--disable-fg);
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 2px 10px;
 }
 .slot-progress.full {
@@ -1588,7 +1620,7 @@ input:focus {
   font-weight: 800;
   letter-spacing: 0;
   padding: 2px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
   color: #fff;
   background: rgba(0, 0, 0, 0.34);
@@ -1630,7 +1662,7 @@ input:focus {
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--gold);
   background: rgba(245, 193, 92, 0.14);
   box-shadow: inset 0 0 0 1px rgba(245, 193, 92, 0.30);
@@ -1702,7 +1734,7 @@ input:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   /* 牌尺寸是 JS 按可用高算出来的，不该再被 flex 二次收缩 ——
    * 实测矮屏桌带里空牌位会被压到 96（内联写的是 109），
    * 等真正发牌时 img 比容器宽就会盖住右边一张。 */
@@ -1730,13 +1762,13 @@ input:focus {
 .slot.is-active {
   border-left-color: var(--slot-color);
   background: rgba(255, 255, 255, 0.075);
-  box-shadow: 0 0 0 2px var(--slot-soft, rgba(255, 255, 255, 0.2)), 0 10px 22px rgba(0, 0, 0, 0.20);
+  box-shadow: 0 0 0 2px var(--slot-soft, rgba(255, 255, 255, 0.2)), var(--elev-2);
 }
 /* 拖到这组上方时的落点反馈 */
 .slot.drop-hover {
   border-left-color: #fff;
   background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 0 4px var(--slot-color), 0 10px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 4px var(--slot-color), var(--elev-2);
 }
 .slot.drop-hover .card-box.empty { background: rgba(255, 255, 255, 0.16); }
 
@@ -1747,7 +1779,7 @@ input:focus {
  * 否则六张牌全入组之后，「换位置」和「塞进这组」会变成同一个手势、两种结果。
  * 金色描边 + 抬起，比整组的白色外框更小、更贴身。 */
 .card-box.drop-swap {
-  border-radius: 14px;
+  border-radius: var(--r-card);
   box-shadow: 0 0 0 4px var(--gold), 0 0 26px rgba(245, 193, 92, 0.5);
   transform: translateY(-8px) scale(1.05);
   transition: transform var(--dur-1) var(--ease-std), box-shadow var(--dur-1) var(--ease-std);
@@ -1756,7 +1788,7 @@ input:focus {
 /* ---------- 牌 ---------- */
 .card {
   display: block;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   box-shadow: var(--elev-2);
   cursor: pointer;
   background: #fff;
@@ -1781,7 +1813,7 @@ input:focus {
   position: fixed;
   z-index: 200;
   pointer-events: none;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   box-shadow: var(--elev-3), var(--edge-paper);
   transform: translate(-50%, -50%) scale(1.06);
   opacity: 0.96;
@@ -1842,7 +1874,7 @@ body.is-dragging { cursor: grabbing; }
   gap: 8px;
   min-height: 88px;              /* 88 设计px = 屏上约 44 物理 px，符合最小热区 */
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.3);
   border: 2px solid rgba(255, 255, 255, 0.14);
   box-shadow: inset 6px 0 0 var(--slot-color, #9aa4b2);
@@ -2138,7 +2170,7 @@ body.is-dragging { cursor: grabbing; }
   font-weight: 800;
   color: #fff;
   background: var(--brand-green);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6), 0 6px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6), var(--elev-1);
 }
 .pf-name-wrap { min-width: 0; }
 .pf-name {
@@ -2181,7 +2213,7 @@ body.is-dragging { cursor: grabbing; }
   margin-top: 10px;
   padding: 10px 12px;
   font-size: 20px;
-  border-radius: 14px;
+  border-radius: var(--r-card);
 }
 .ss-info .pf-ach-num { font-size: 22px; }
 .ss-info .pf-ach-star { font-size: 22px; }
@@ -2198,7 +2230,7 @@ body.is-dragging { cursor: grabbing; }
   width: 100%;
   margin-top: 14px;
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   border: 1px solid rgba(232, 163, 61, 0.45);
   background: rgba(245, 193, 92, 0.14);
   color: var(--gold-ink);
@@ -2223,7 +2255,7 @@ body.is-dragging { cursor: grabbing; }
 .pf-stat {
   min-width: 0;
   padding: 14px 6px 12px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   background: rgba(26, 29, 35, 0.05);
   text-align: center;
 }
@@ -2261,7 +2293,7 @@ body.is-dragging { cursor: grabbing; }
   font-weight: 700;
   color: var(--cta-red-deep);
   background: rgba(214, 40, 40, 0.10);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px 12px;
 }
 .pf-streak.down { color: var(--brand-green-deep); background: rgba(14, 140, 110, 0.12); }
@@ -2317,7 +2349,7 @@ body.is-dragging { cursor: grabbing; }
   align-self: center;
   margin: 0 0 16px;
   padding: 10px 40px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: linear-gradient(180deg, var(--gold), var(--gold-deep));
   color: var(--warm-ink);
   font-size: 40px;
@@ -2327,7 +2359,7 @@ body.is-dragging { cursor: grabbing; }
 .result-group {
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 16px;
+  border-radius: var(--r-card);
   padding: 14px;
   margin-bottom: 12px;
   position: relative;
@@ -2352,7 +2384,7 @@ body.is-dragging { cursor: grabbing; }
 .result-head-x2 {
   flex: 0 0 auto;
   padding: 1px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: linear-gradient(135deg, #ffe08a, #ffb347);
   color: #7a3b00;
   font-size: 16px;
@@ -2370,7 +2402,7 @@ body.is-dragging { cursor: grabbing; }
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   margin-bottom: 6px;
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -2408,7 +2440,7 @@ body.is-dragging { cursor: grabbing; }
   font-variant-numeric: tabular-nums;
   color: #8b93a1;
   background: rgba(15, 23, 42, 0.06);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 1px 9px;
   line-height: 1.5;
 }
@@ -2441,7 +2473,7 @@ body.is-dragging { cursor: grabbing; }
   font-size: 20px;
   font-weight: 800;
   padding: 5px 16px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   box-shadow: var(--elev-1);
   animation: bannerIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -2457,7 +2489,7 @@ body.is-dragging { cursor: grabbing; }
 .result-abort-note {
   margin: 2px 0 6px;
   padding: 8px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   background: rgba(0, 0, 0, 0.05);
   font-size: 18px;
   line-height: 1.5;
@@ -2475,7 +2507,7 @@ body.is-dragging { cursor: grabbing; }
 .result-seq-bar {
   height: 4px;
   margin: 4px 2px 12px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.07);
   overflow: hidden;
 }
@@ -2585,7 +2617,7 @@ body.is-dragging { cursor: grabbing; }
   align-items: center;
   gap: 14px;
   padding: 8px 12px;
-  border-radius: 14px;
+  border-radius: var(--r-card);
   background: rgba(0, 0, 0, 0.04);
 }
 /* 「我」这一行靠左边一条金线，不靠底色：底色和冠军行的金色撞色后
@@ -2626,7 +2658,7 @@ body.is-dragging { cursor: grabbing; }
 .rb-next {
   margin: 0 0 18px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   background: rgba(245, 193, 92, 0.16);
   font-size: 20px;
   line-height: 1.45;
@@ -2906,7 +2938,7 @@ body.is-dragging { cursor: grabbing; }
  * 豹子 / 五花牛 / 10.5 一眼就懂，牛牛不圈的话没人看得出凭什么赢。 */
 .pat-cd.is-mk {
   box-shadow: 0 0 0 3px rgba(245, 193, 92, 0.95), 0 0 30px rgba(245, 193, 92, 0.7);
-  border-radius: 11px;
+  border-radius: var(--r-chip);
 }
 .pat-mkb {
   position: absolute;
@@ -2915,7 +2947,7 @@ body.is-dragging { cursor: grabbing; }
   transform: translate(-50%, -50%);
   z-index: 3;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: linear-gradient(180deg, #ffe8a8, #f5c15c);
   font-size: 16px;
   font-weight: 800;
@@ -3028,7 +3060,7 @@ body.is-dragging { cursor: grabbing; }
   margin-bottom: 12px;
   background: rgba(0, 0, 0, 0.24);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 16px;
+  border-radius: var(--r-card);
   /* 尾部箭头（.settle-go）是绝对定位的：把它塞进 grid 会多出一列，
    * 名字列被挤窄 16px —— 而这两行本来就是按当前列宽调过省略号位置的。
    * 绝对定位的子元素不参与 grid 排布，加它等于零成本。 */
@@ -3057,7 +3089,7 @@ body.is-dragging { cursor: grabbing; }
   display: inline-block;
   margin-left: 10px;
   padding: 1px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(245, 193, 92, 0.18);
   border: 1px solid rgba(245, 193, 92, 0.5);
   color: var(--gold);
@@ -3125,7 +3157,7 @@ body.is-dragging { cursor: grabbing; }
   min-width: 24px;
   height: 24px;
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(26, 29, 35, 0.88);
   border: 1.5px solid rgba(255, 255, 255, 0.55);
   color: #fff;
@@ -3158,7 +3190,7 @@ body.is-dragging { cursor: grabbing; }
   display: inline-block;
   margin-left: 10px;
   padding: 1px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.42);
   color: #fff;
@@ -3179,7 +3211,7 @@ body.is-dragging { cursor: grabbing; }
    * 箭头占 18~6，中间留 13 —— 净胜是 32~48px 的大字，
    * 箭头只要贴上去就会被读成「负号」或者干脆糊成一片（截图里真的会）。 */
   width: 12px;
-  font-size: 22px;
+  font-size: var(--fs-4);
   line-height: 1;
   text-align: center;
   color: rgba(255, 255, 255, 0.26);
@@ -3213,7 +3245,7 @@ body.is-dragging { cursor: grabbing; }
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px dashed rgba(255, 255, 255, 0.16);
-  font-size: 24px;
+  font-size: var(--fs-3);
   line-height: 1.35;
   color: var(--gray-aux);
   font-variant-numeric: tabular-nums;
@@ -3225,16 +3257,16 @@ body.is-dragging { cursor: grabbing; }
 .settle-recheck .sr-val.flat { color: var(--gray-aux); }
 .settle-recheck .sr-sep { opacity: 0.5; }
 /* 差 3 分以上才出现的提示：金色但压一档，避免和「你拿了」抢注意力 */
-.settle-recheck .sr-hint { color: var(--gold); font-size: 22px; }
+.settle-recheck .sr-hint { color: var(--gold); font-size: var(--fs-4); }
 /* 分到最优时没有对比数字，只有一句结论 + 那个数 */
 .settle-recheck .sr-note { color: var(--gold); }
 
-.settle-tip { font-size: 20px; color: var(--gray-aux); text-align: center; margin: 10px 0; line-height: 1.5; }
+.settle-tip { font-size: var(--fs-4); color: var(--gray-aux); text-align: center; margin: 10px 0; line-height: 1.5; }
 /* 含 AI 的局：这一句是「结论」不是「公式」，所以用金色提到前面一档。
  * 玩家看完结算就要判断「我这把算不算战绩」，漏掉它只会以为数据丢了。 */
 .settle-ai-note {
   margin: 2px 0 10px;
-  font-size: 20px;
+  font-size: var(--fs-4);
   text-align: center;
   color: var(--gold);
 }
@@ -3245,24 +3277,31 @@ body.is-dragging { cursor: grabbing; }
 .settle-crown {
   margin: 4px 0 16px;
   padding: 18px 16px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   text-align: center;
   background: linear-gradient(180deg, rgba(245, 193, 92, 0.16), rgba(245, 193, 92, 0.04));
   border: 1px solid rgba(245, 193, 92, 0.35);
 }
 .settle-crown.hidden { display: none; }
-.sc-k { margin: 0; font-size: 22px; letter-spacing: 2px; color: var(--gold); }
-.sc-name { margin: 6px 0 2px; font-size: 40px; font-weight: 800; color: var(--text-main); }
-.sc-net { margin: 0; font-size: 30px; color: var(--gold); font-variant-numeric: tabular-nums; }
-.sc-gap { margin: 6px 0 0; font-size: 22px; color: var(--gray-aux); }
+.sc-k { margin: 0; font-size: var(--fs-4); letter-spacing: 2px; color: var(--gold); }
+/* 冠军块的数字和名次表是同一个数，只能有一套答案（P0-1）：
+ * 名字 32（num-3）＜ 净胜 48（num-2），和名次表的 28＜48 同向；
+ * 颜色也不再用金色写"第二个答案"——冠军荣誉交给标题/边框/底色，
+ * 净胜作为数据走和名次表、战绩卡、排行榜相同的 up/down/flat 三态。 */
+.sc-name { margin: 6px 0 2px; font-size: var(--num-3); font-weight: 800; color: var(--text-main); }
+.sc-net { margin: 0; font-size: var(--num-2); color: var(--gray-aux); font-variant-numeric: tabular-nums; }
+.sc-net.up { color: var(--up-red); }
+.sc-net.down { color: var(--down-green); }
+.sc-net.flat { color: var(--gray-aux); }
+.sc-gap { margin: 6px 0 0; font-size: var(--fs-4); color: var(--gray-aux); }
 
 .settle-reset-note {
   margin: 2px 0 10px;
-  font-size: 20px;
+  font-size: var(--fs-4);
   text-align: center;
   color: var(--gray-aux);
 }
-.settle-wait { font-size: 24px; color: var(--gray-aux); }
+.settle-wait { font-size: var(--fs-3); color: var(--gray-aux); }
 /* 「等人」还剩多久（v125）：跟在说明后面的一小截，不换行占高度 ——
    结算页在 390×844 上没有多余的一行（见 settleView renderWaitRow 上方那段）。
    等宽数字：不这样的话每跳一秒整句会左右抖一下。 */
@@ -3311,7 +3350,7 @@ body.is-dragging { cursor: grabbing; }
  * 旁听是个「你得先知道自己不在这一局里」的状态，标识看不清就等于没有。 */
 .sp-badge {
   padding: 4px 16px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--brand-green);
   border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
@@ -3336,7 +3375,7 @@ body.is-dragging { cursor: grabbing; }
   gap: 10px;   /* v122：末尾多了一颗「等人」，靠缩这里把整行压回滚动区内（journey 报 bodyOver 1px） */
   margin: 12px 0 2px;
   padding: 10px 14px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.10);
 }
@@ -3346,7 +3385,7 @@ body.is-dragging { cursor: grabbing; }
   flex: 0 0 auto;
   min-width: 88px; min-height: 88px;
   padding: 0 6px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: transparent;
   color: var(--text-main);
@@ -3395,7 +3434,7 @@ body.is-dragging { cursor: grabbing; }
   min-height: 88px;
   margin: 8px 0;
   padding: 0;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   border: 1px dashed rgba(255, 255, 255, 0.28);
   background: transparent;
   color: var(--gray-aux);
@@ -3431,7 +3470,7 @@ body.is-dragging { cursor: grabbing; }
   background: rgba(0, 0, 0, 0.85);
   color: var(--gold);
   font-size: 24px;
-  border-radius: 24px;
+  border-radius: var(--r-modal);
   z-index: 80;
   text-align: center;
   /* 它只是通知，不是控件 —— 必须让点击穿过去。
@@ -3452,7 +3491,7 @@ body.is-dragging { cursor: grabbing; }
 .toast.warn {
   color: #FFE7E7;
   background: rgba(52, 12, 12, 0.94);
-  box-shadow: inset 0 0 0 2px rgba(255, 93, 93, 0.55), 0 12px 30px rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 0 0 2px rgba(255, 93, 93, 0.55), var(--elev-2);
 }
 
 /* ── 「5 秒内可以反悔」条（v136）────────────────────────────────────
@@ -3475,7 +3514,7 @@ body.is-dragging { cursor: grabbing; }
   gap: 22px;
   max-width: 670px;
   padding: 16px 20px 16px 30px;
-  border-radius: 24px;
+  border-radius: var(--r-modal);
   background: rgba(12, 30, 24, 0.96);
   color: var(--warm-white);
   box-shadow: var(--elev-2), inset 0 0 0 1px rgba(245, 193, 92, 0.28);
@@ -3494,7 +3533,7 @@ body.is-dragging { cursor: grabbing; }
   min-height: 88px;
   padding: 0 34px;
   border: 0;
-  border-radius: 18px;
+  border-radius: var(--r-card);
   background: var(--gold);
   color: var(--warm-ink);
   font-size: 26px;
@@ -4355,7 +4394,7 @@ body.is-dragging { cursor: grabbing; }
   width: 100%;
   max-height: 62vh;
   object-fit: contain;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   background: var(--green-mid);
 }
 .share-tip {
@@ -4417,7 +4456,7 @@ body.is-dragging { cursor: grabbing; }
 .auth-logo {
   width: 124px;
   height: 124px;
-  border-radius: 24px;
+  border-radius: var(--r-modal);
   overflow: hidden;
   box-shadow: var(--elev-2), 0 0 0 3px rgba(245, 193, 92, 0.55);
 }
@@ -4463,14 +4502,14 @@ body.is-dragging { cursor: grabbing; }
   gap: 8px;
   padding: 8px;
   margin-bottom: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.26);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 .auth-tab {
   height: 76px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
   font-family: inherit;
   font-size: 28px;
@@ -4508,7 +4547,7 @@ body.is-dragging { cursor: grabbing; }
 .auth-err {
   margin: 4px 0 20px;
   padding: 16px 22px;
-  border-radius: 16px;
+  border-radius: var(--r-card);
   background: rgba(214, 40, 40, 0.16);
   border: 1px solid rgba(255, 93, 93, 0.40);
   color: #FFC9C9;
@@ -4871,9 +4910,9 @@ a:focus-visible {
   min-height: 196px;
   padding: 22px 18px 24px;
   margin-bottom: 24px;
-  border-radius: 24px;
+  border-radius: var(--r-modal);
   background: radial-gradient(circle at 50% 6%, #245946 0%, #154036 52%, var(--green-deep) 100%);
-  box-shadow: inset 0 0 0 2px rgba(245, 193, 92, 0.26), 0 6px 18px rgba(15, 43, 34, 0.22);
+  box-shadow: inset 0 0 0 2px rgba(245, 193, 92, 0.26), var(--elev-1);
 }
 /* 第一屏要一眼看出「1 张 / 2 张 / 3 张」是三组。
  * 试过等宽三列：三组里第三组有 3 张牌（3×72+gap），比一列的宽度还宽，
@@ -4917,7 +4956,7 @@ a:focus-visible {
   justify-content: center;
   width: 68px;
   height: 96px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   background: linear-gradient(170deg, #FFFFFF, #FFF8E9);
   color: var(--ink);
   font-size: 32px;
@@ -4995,7 +5034,7 @@ a:focus-visible {
  * 改成浅金衬底的圆角色块，才看得出「这是另外一句、要读」。 */
 .guide-tip {
   padding: 18px 20px;
-  border-radius: 12px;
+  border-radius: var(--r-chip);
   background: rgba(245, 193, 92, 0.15);
   border-left: 6px solid var(--gold);
   font-size: 24px;
@@ -5240,7 +5279,7 @@ a:focus-visible {
   看不出把与把的边界；现在把次是卡、轮次是卡里的分段。 */
 .replay-pack {
   border: 1px solid rgba(22, 56, 47, 0.12);
-  border-radius: 16px;
+  border-radius: var(--r-card);
   padding: 4px 24px 16px;
   margin-bottom: 20px;
 }
@@ -5274,7 +5313,7 @@ a:focus-visible {
 }
 .replay-pack-flag {
   padding: 1px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(176, 132, 32, 0.14);
   border: 1px solid rgba(176, 132, 32, 0.45);
   color: #8A6A1F;
@@ -5358,7 +5397,7 @@ a:focus-visible {
   display: inline-block;
   margin-left: 8px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: rgba(176, 132, 32, 0.14);
   border: 1px solid rgba(176, 132, 32, 0.42);
   color: #8A6A1F;
@@ -5427,7 +5466,7 @@ a:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   border: 1px solid rgba(245, 193, 92, 0.26);
-  border-radius: 18px;
+  border-radius: var(--r-card);
   background: rgba(30, 90, 68, 0.42);
   overflow: hidden;
 }
@@ -5464,7 +5503,7 @@ a:focus-visible {
   margin-left: 14px;
   padding: 6px 16px;
   border: 1px solid rgba(245, 193, 92, 0.5);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 28px;
   font-weight: 700;
   color: var(--gold);
@@ -5531,7 +5570,7 @@ a:focus-visible {
   margin: 6px 0 0;
   padding: 16px 18px;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 14px;
+  border-radius: var(--r-card);
   background: rgba(255, 255, 255, 0.05);
   font-size: 20px;
   line-height: 1.65;
@@ -5566,7 +5605,7 @@ a:focus-visible {
   justify-content: center;
   gap: 4px;
   border: 3px solid rgba(58, 29, 0, 0.14);
-  border-radius: 18px;
+  border-radius: var(--r-card);
   background: rgba(58, 29, 0, 0.04);
   font-family: inherit;
   color: var(--warm-ink);

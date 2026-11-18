@@ -196,7 +196,7 @@
       ghost.src = getCardImg(card, w, h);
       ghost.draggable = false;
       ghost.style.cssText = 'position:absolute;left:' + to.x + 'px;top:' + to.y + 'px;width:' + w + 'px;height:' + h + 'px;'
-        + 'z-index:40;pointer-events:none;border-radius:16px;box-shadow:0 16px 32px rgba(0,0,0,0.45);'
+        + 'z-index:40;pointer-events:none;border-radius:16px;box-shadow:var(--elev-2);'
         + 'transform:translate(' + (from.x - to.x) + 'px,' + (from.y - to.y) + 'px) scale(' + (from.w / w).toFixed(3) + ') rotate(' + ((delay || 0) % 2 ? 4 : -4) + 'deg);'
         + 'transition:transform 0.35s cubic-bezier(0,0,0.2,1);';
       screen.appendChild(ghost);

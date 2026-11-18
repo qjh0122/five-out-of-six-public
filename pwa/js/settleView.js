@@ -589,7 +589,7 @@
     });
 
     var next = (StateMachine.ROUND_GROUPS || {})[2] || [];
-    $('#rb-sub').textContent = '本轮各家净得';
+    $('#rb-sub').textContent = '本轮各家净胜';
     /* 两行说两件事：**先比什么**（原来只说「3 秒后发牌」，玩家不知道第二轮先比哪组），
      * 再**什么时候开始**。塞一行会在「→ 斗牛」和「分数延续」之间折断，
      * 折出来的第二行只有四个字，看着像一句没写完的话。 */
@@ -671,7 +671,9 @@
     var top = champs[0].p;
     var head = el('p', 'sc-k', champs.length > 1 ? '并列冠军' : '本局冠军');
     var name = el('p', 'sc-name', names);
-    var net = el('p', 'sc-net', (top.score > 0 ? '+' : '') + top.score + ' 分');
+    /* 净胜和名次表是同一个数：字号走 num-2，颜色也走同一套三态（P0-1）。
+     * 冠军的荣誉感由 .sc-k / 金色边框表达，不再靠把数字染成第二套颜色。 */
+    var net = el('p', 'sc-net ' + netCls(top.score), (top.score > 0 ? '+' : '') + top.score + ' 分');
     box.appendChild(head);
     box.appendChild(name);
     box.appendChild(net);

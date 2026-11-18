@@ -77,25 +77,44 @@ function layers(v) {
 }
 
 /**
- * 分类：这条阴影属不属于「外投影（高度）」。
- * 是 → 必须走 --elev-*；不是 → 归入造型类，不判。
- *
- * 只看**第一层**：`0 8px 20px ..., inset 0 1px 0 ...` 的语义是「一张浮起来的卡 + 它的内高光」，
- * 整体按外投影算；反过来 `0 0 16px ..., var(--elev-2)` 是「光环 + 已归位的高度」，不判。
+ * 带色氛围投影：表达「状态 / 氛围」，不是「离桌面多高」，不进 elevation 标尺。
+ * 必须**按字面值**列出而不是按颜色通配 —— 通配会把未来的裸黑投影也一起放过去。
+ * 三处均在 style.css：.slot-point.best（绿）/ .card-wrap.selected .card（金）/ .av-cell.is-on（金）。
+ * 下方 [6] 还会断言这三条仍在 CSS 里，防止豁免变成永远命中的死白名单。
  */
-function isElevation(v) {
-  if (!v) return false;
-  if (/^var\(--elev-/.test(v)) return false;          // 已经是令牌
-  const first = layers(v)[0] || '';
-  if (/^inset\b/.test(first)) return false;           // 内描边/内高光/色条
-  const parts = first.split(/\s+/);
+const ATMOSPHERE = [
+  '0 4px 12px rgba(67, 209, 124, 0.24)',
+  '0 12px 24px rgba(245, 193, 92, 0.45)',
+  '0 4px 12px rgba(245, 193, 92, 0.35)'
+];
+
+/**
+ * 分类：**逐层**判定，任一层是裸外投影即违规（P0-4）。
+ * 原先只看 layers(v)[0]，于是「inset 描边 + 裸投影」「状态环 + 裸投影」全部漏检，
+ * 静态断言的「外投影字面量 = 0」只是在分类器盲区下成立。
+ *
+ * 显式豁免（造型，不是高度；改这里必须写理由）：
+ *   · `var(--elev-*)` / `var(--edge-*)` —— 已归位的高度 / 纸边；
+ *   · `inset ...`                     —— 内描边 / 内高光 / 左色条；
+ *   · y=0（`0 0 Npx`）                 —— 四向状态发光 / 环；
+ *   · blur=0（`0 2px 0 <色>`）          —— 实体按钮下沿；
+ *   · ATMOSPHERE 里三条带色氛围投影      —— 见上面的注释。
+ */
+function layerIsElevation(layer) {
+  if (!layer) return false;
+  const v = layer.trim();
+  if (/^var\(--(elev-|edge-)/.test(v)) return false;
+  if (/^inset\b/.test(v)) return false;
+  if (ATMOSPHERE.indexOf(v) >= 0) return false;
+  const parts = v.split(/\s+/);
   const num = (s) => (s === undefined ? NaN : parseFloat(s));
-  if (num(parts[0]) !== 0) return false;              // x 偏移不为 0（少见，发光/斜影）不按高度管
-  const y = num(parts[1]);
-  const blur = num(parts[2]);
-  if (!(y > 0)) return false;                         // y=0 → 四向光环，表达状态不表达高度
-  if (!(blur > 0)) return false;                      // blur=0 → 实体按钮下沿（造型）
+  if (num(parts[0]) !== 0) return false;              // x 偏移不为 0（发光/斜影）不按高度管
+  if (!(num(parts[1]) > 0)) return false;             // y=0 → 四向光环
+  if (!(num(parts[2]) > 0)) return false;             // blur=0 → 实体按钮下沿
   return true;
+}
+function isElevation(v) {
+  return !!v && layers(v).some(layerIsElevation);
 }
 
 /* =================== [1] 光的三档：令牌定义齐全 =================== */
@@ -136,9 +155,21 @@ head('[2] 分类器自测（不测这个，「零违规」就没有意义）');
   ok(!isElevation('0 2px 0 #B47F22'), '★ 实体按钮下沿（blur=0）→ 不判（这是造型）');
   ok(!isElevation('0 0 16px rgba(245, 193, 92, 0.5)'), '★ 状态发光（y=0）→ 不判');
   ok(!isElevation('0 0 16px rgba(245, 193, 92, 0.5), var(--elev-2)'),
-    '★ 光环 + 已归位的高度 → 不判（第一层是环，不是投影）');
+    '★ 光环 + 已归位的高度 → 不判（逐层都过不了外投影特征）');
   ok(!isElevation('0 0 10px rgba(67, 209, 124, 0.22), inset 0 -6px 10px rgba(0, 0, 0, 0.20)'),
     '★ 光环 + 内影 → 不判');
+  ok(!isElevation('var(--elev-1), var(--edge-hairline)'), '★ 组合 token（高度 + 纸边）→ 不判');
+  ok(!isElevation('inset 0 1px 0 rgba(255, 255, 255, 0.07), var(--elev-1)'),
+    '★ inset 在前 + 令牌在后 → 不判');
+  ok(!isElevation('0 0 0 4px var(--slot-color), var(--elev-2)'), '★ 状态环在前 + 令牌在后 → 不判');
+  ok(!isElevation('inset 0 0 0 1px rgba(67, 209, 124, 0.55), ' + ATMOSPHERE[0]),
+    '★ 状态边 + 带色氛围投影 → 显式豁免');
+  ok(isElevation('inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4)'),
+    '★★ inset 在前、裸投影在第 2 层 → 必须判违规（旧分类器在这里是瞎的）');
+  ok(isElevation('0 0 0 3px var(--gold), 0 12px 30px rgba(0, 0, 0, 0.42)'),
+    '★★ 状态环在前、裸投影在第 2 层 → 必须判违规');
+  ok(isElevation('inset 0 3px 30px rgba(0, 0, 0, 0.52), inset 0 -18px 44px rgba(0, 0, 0, 0.30), 0 18px 46px rgba(0, 0, 0, 0.34)'),
+    '★★ 裸投影在第 3 层 → 必须判违规');
   ok(isElevation('0 4px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'),
     '★ 颜色里的逗号不能把一层切碎（回归：曾被 split(",") 误判）');
   ok(!isElevation('inset 0 1px 0 rgba(255, 255, 255, 0.45)'), '内高光 → 不判');
@@ -191,6 +222,141 @@ head('[5] 纸的厚度来自边缘');
   const stage = /#stage\s*\{([\s\S]*?)\}/.exec(style);
   ok(!!stage && /radial-gradient/.test(stage[1]), '★ 毡面有一层中心光（不是均色底）');
   ok(!!stage && /tabular-nums/.test(stage[1]), '★ 数字全局等宽（否则一列分数会左右跳）');
+}
+
+/* =================== [6] var() 引用完整性（P0-3） ===================
+ * `--text-main` 曾经 4 处引用 0 处定义：声明静默作废、靠 body 继承碰巧可读。
+ * 这类缺陷以前没有任何断言会红——CSS 里"写了 color"看起来和真生效一模一样。
+ * 判据：所有 CSS 里的 var(--x) 必须能在 CSS 定义或 JS 注入白名单里找到。 */
+head('[6] var() 引用完整性');
+{
+  const JS_DIR = path.join(__dirname, '..', 'js');
+  const jsFiles = fs.readdirSync(JS_DIR).filter((f) => /\.js$/.test(f));
+  const jsSrc = jsFiles.map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8')).join('\n')
+    + fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  /* JS 注入项必须**显式**列出（不靠"没定义就放行"蒙混）。每一行都要能在 JS 源里
+   * 找到 setProperty('--x', …) 或内联 style="--x:…"，否则白名单会腐化成免责声明。 */
+  const JS_INJECTED = [
+    '--vp-h', '--pt-scale', '--ls-scale', '--sa-top', '--sa-bottom', '--sa-left', '--sa-right',
+    '--tap-min', '--gt-h', '--seat-name', '--seat-score', '--seat-label', '--seat-me', '--emo-half',
+    '--emo-k', '--ss-origin', '--slot-color', '--slot-soft', '--fx-color', '--fx-ring', '--hold',
+    '--tail-off', '--nmw', '--a', '--d', '--r', '--pc'
+  ];
+  const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, ' ');
+  const cleanJs = stripJsComments(jsSrc);
+  const foundInJs = new Set();
+  let m;
+  const injectRe = /setProperty\(\s*['"](--[a-z0-9-]+)['"]|--([a-z0-9-]+)\s*:/g;
+  while ((m = injectRe.exec(cleanJs))) foundInJs.add(m[1] || ('--' + m[2]));
+  const stale = JS_INJECTED.filter((v) => !foundInJs.has(v));
+  eq(stale.length, 0, '★★ 显式 JS 注入白名单没有僵尸条目', stale.join(','));
+
+  const refs = new Set(), defs = new Set();
+  const noComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+  for (const f of Object.keys(css)) {
+    const text = noComments(css[f]);
+    let r;
+    const refRe = /var\(\s*(--[a-z0-9-]+)/g;
+    while ((r = refRe.exec(text))) refs.add(r[1]);
+    let d;
+    const defRe = /(--[a-z0-9-]+)\s*:/g;
+    while ((d = defRe.exec(text))) defs.add(d[1]);
+  }
+  ok(refs.size >= 50 && defs.size >= 40, '前置：真的扫到了变量引用与定义（' + refs.size + ' / ' + defs.size + '）');
+  const unresolved = [...refs].filter((v) => !defs.has(v) && JS_INJECTED.indexOf(v) < 0);
+  eq(unresolved.length, 0, '★★ 所有 var() 都能解析到 CSS 定义或 JS 注入白名单', unresolved.join(','));
+  ok(/--text-main\s*:\s*#f5f0e6\b/i.test(css['style.css']),
+    '★★ --text-main 在 :root 明确定义为现网继承色 #f5f0e6（删掉定义此条必须红）');
+}
+
+/* =================== [7] 氛围投影豁免 + JS 内联投影（P0-4） =================== */
+head('[7] 豁免清单与 JS 内联样式');
+{
+  const style = css['style.css'] || '';
+  const missingAtm = ATMOSPHERE.filter((v) => style.indexOf(v) < 0);
+  eq(missingAtm.length, 0, '★★ 三条带色氛围投影仍在 CSS 里（豁免不是永不命中的死白名单）', missingAtm.join(' | '));
+
+  const JS_DIR = path.join(__dirname, '..', 'js');
+  const jsFiles = fs.readdirSync(JS_DIR).filter((f) => /\.js$/.test(f));
+  const bad = [];
+  let total = 0;
+  for (const f of jsFiles) {
+    const src = fs.readFileSync(path.join(JS_DIR, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+    let m;
+    const re = /box-shadow\s*:\s*([^;'"}]+)/gi;
+    while ((m = re.exec(src))) {
+      total += 1;
+      const v = m[1].trim().replace(/\s+/g, ' ');
+      if (isElevation(v)) bad.push(f + ': box-shadow: ' + v);
+    }
+  }
+  ok(total >= 1, '前置：JS 内联 box-shadow 扫描器扫到了声明（' + total + ' 条，太少说明解析坏了）');
+  eq(bad.length, 0, '★★ JS 内联样式没有裸外投影（cardView 的飘牌也走 --elev-*）', bad.join(' | '));
+  ok(/box-shadow:\s*var\(--elev-2\)/.test(fs.readFileSync(path.join(JS_DIR, 'cardView.js'), 'utf8')),
+    '★ cardView.js 的飘牌走 --elev-2');
+}
+
+/* =================== [8] 圆角四档（P1-P7） =================== */
+head('[8] 圆角：四档 token + 近重复漂移归零');
+{
+  const RADIUS_TOKENS = { '--r-chip': '12px', '--r-card': '16px', '--r-modal': '24px', '--r-pill': '999px' };
+  /* 漂移家族：审计点名的 11/14/18/26，分别并到 12/16/16/28。
+   * 这四档字面量在全站必须为 0 —— 它们没有语义，只是逐屏手输出来的近重复。 */
+  const DRIFT = ['11px', '14px', '18px', '26px'];
+  /* 显式几何豁免。每一项都必须在 CSS 里还有一处（下面有僵尸检查），
+   * 否则这张表会腐化成"什么都能放行"的免责声明。
+   *   · 0 / 50% / inherit 是几何原语，不是形状档位；
+   *   · 3/6/8/10/20/28/32/48 是既成卡/角标/圆形/半屏上沿的形状，硬并进四档
+   *     会肉眼可见地改版（28→24 是 4px、影响 6 张纸卡），按"观感明显变化处
+   *     记录取舍、不硬压"保守保留；
+   *   · calc() 那一条是表情气泡随缩放系数放大，基准值已换成 var(--r-card)。 */
+  const GEOMETRY_ALLOW = [
+    '0', '50%', 'inherit', '3px', '6px', '8px', '10px', '20px', '28px', '28px 28px 0 0',
+    '32px', '48px', 'calc(var(--r-card) * var(--emo-k, 1))'
+  ];
+  const radiusVerdict = (v) => {
+    if (/^var\(--r-(chip|card|modal|pill)\)$/.test(v)) return null;
+    if (GEOMETRY_ALLOW.indexOf(v) >= 0) return null;
+    return '非法圆角：' + v;
+  };
+  /* 分类器自测：先证明它抓得住漂移和现编值，否则"零违规"没意义 */
+  eq(radiusVerdict('var(--r-card)'), null, '分类器自测：token 放行');
+  eq(radiusVerdict('50%'), null, '分类器自测：几何原语放行');
+  ok(radiusVerdict('14px') !== null, '分类器自测：14px 漂移被抓');
+  ok(radiusVerdict('17px') !== null, '分类器自测：现编 17px 被抓');
+
+  const style = css['style.css'] || '';
+  const root = /:root\s*\{([\s\S]*?)\n\}/.exec(style);
+  ok(!!root, '找得到 :root');
+  const body = root ? root[1] : '';
+  for (const [k, v] of Object.entries(RADIUS_TOKENS)) {
+    const m = new RegExp('\\' + k + '\\s*:\\s*([^;]+);').exec(body);
+    eq(m ? m[1].trim() : null, v, k + ' = ' + v + '（删/改档必须红）');
+  }
+
+  const seen = new Set(), bad = [], allowSeen = new Set();
+  for (const f of FILES) {
+    const text = css[f] || '';
+    let m;
+    const re = /border-radius\s*:\s*([^;}]+)/g;
+    while ((m = re.exec(text))) {
+      const v = m[1].trim().replace(/\s+/g, ' ');
+      seen.add(v);
+      const verdict = radiusVerdict(v);
+      if (verdict) bad.push(f + ': ' + v + ' → ' + verdict);
+      else if (GEOMETRY_ALLOW.indexOf(v) >= 0) allowSeen.add(v);
+    }
+  }
+  ok(seen.size >= 15, '前置：真的扫到了圆角声明（' + seen.size + ' 种取值）');
+  eq(bad.length, 0, '★★ 圆角只取 --r-* 或显式几何豁免（11/14/18/26 漂移归零）', bad.join(' | '));
+  const missingAllow = GEOMETRY_ALLOW.filter((v) => !allowSeen.has(v));
+  eq(missingAllow.length, 0, '★★ 几何豁免清单没有僵尸条目', missingAllow.join(' | '));
+  ok(seen.size <= 17, '★★ 圆角取值种类从 21 收敛到 ≤17（现 ' + seen.size + '）');
+  for (const k of Object.keys(RADIUS_TOKENS)) {
+    ok([...seen].some((v) => v === 'var(' + k + ')'), '★ ' + k + ' 真的被用到了（不是纸面 token）');
+  }
 }
 
 console.log('\n========================================');

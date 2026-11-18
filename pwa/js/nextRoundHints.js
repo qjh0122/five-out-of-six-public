@@ -94,12 +94,12 @@
          * 2 人房要补 2 只，会造出「0 个真人 + 2 只 AI 自己打、真人在旁边看」的空转局。
          * 真正的路就在旁边那颗主按钮上 —— 按下它 joined 就变 1，
          * 那时候再说「补 AI」才是对的（补 1 只就够）。 */
-        return '这一局还没人上场 · 点「开始下一局」就开' + off;
+        return '这一局还没人上场 · 点「开始下一局」就开局' + off;
       }
       if (ctx.isOwner) {
-        return '还差 ' + lack + ' 人才能开 · 可以先补 AI 队友，或等朋友进来' + off;
+        return '还差 ' + lack + ' 人才能开局 · 可以先补 AI，或等朋友进来' + off;
       }
-      return '还差 ' + lack + ' 人才能开 · 房主可以补 AI 队友' + off;
+      return '还差 ' + lack + ' 人才能开局 · 房主可以补 AI' + off;
     },
 
     WAITING_OTHERS: function (ctx) {
@@ -110,7 +110,7 @@
       var who = whoText(ctx.offline && ctx.offline.length ? ctx.offline : ctx.pending);
       /* 「等他重连」和「不等他」都写出来：前者是希望，后者是出口。
        * 只说前者，全桌会一直盯着一个黑掉的头像。 */
-      return (who ? who + ' ' : '有人 ') + '掉线了 · 等他重连，或者补 AI 队友继续';
+      return (who ? who + ' ' : '有人 ') + '掉线了 · 等他重连，或者补 AI 继续';
     }
   };
 

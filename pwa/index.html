@@ -7,7 +7,7 @@
      iOS Safari 从 iOS 10 起**故意忽略**它（无障碍考虑），所以真正的锁在 game.js 的 lockPageZoom()。 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#16382F">
-<meta name="app-version" content="20261119a">
+<meta name="app-version" content="20261119b">
 <title>六选五</title>
 <!-- 首帧底色（内联，不等网络）。
  *
@@ -27,7 +27,7 @@
 <!-- 存储收口：**必须**在内联脚本之前加载，而且不能 defer。
      下面两段内联脚本（分享码自愈 / 首帧会话判断）比任何 defer 脚本都早，
      读的就是这里的键；键名与降级逻辑只允许存在一份，见 js/storage.js。 -->
-<script src="./js/storage.js?v=20261119a"></script>
+<script src="./js/storage.js?v=20261119b"></script>
 <script>
 /* 访问凭据（sharecode）的记忆与自愈。
  *
@@ -186,9 +186,9 @@ window.addEventListener('beforeinstallprompt', function (e) {
   } catch (e) { /* 存储不可用就当作已登录，让 boot 自己判 */ }
 })();
 </script>
-<link rel="stylesheet" href="./css/style.css?v=20261119a">
-<link rel="stylesheet" href="./css/records.css?v=20261119a">
-<link rel="stylesheet" href="./css/emoji.css?v=20261119a">
+<link rel="stylesheet" href="./css/style.css?v=20261119b">
+<link rel="stylesheet" href="./css/records.css?v=20261119b">
+<link rel="stylesheet" href="./css/emoji.css?v=20261119b">
 <script>
 /* flex gap 检测 + 兼容层按需加载。
  *
@@ -242,8 +242,8 @@ window.addEventListener('beforeinstallprompt', function (e) {
      defer 脚本要等 HTML 解析到那一行才开始下载，而它们在 <body> 末尾 ——
      这里提前声明，让下载和解析并行。URL 必须和下面的 src/href **完全一致**
      （带同样的 ?v=），否则等于下两份。 -->
-<link rel="preload" href="./css/style.css?v=20261119a" as="style">
-<link rel="preload" href="./js/game.js?v=20261119a" as="script">
+<link rel="preload" href="./css/style.css?v=20261119b" as="style">
+<link rel="preload" href="./js/game.js?v=20261119b" as="script">
 </head>
 <body>
 <!-- 断网提示：以前断网后界面上没有任何变化，玩家只能靠"点了没反应"猜 -->
@@ -356,11 +356,11 @@ window.addEventListener('beforeinstallprompt', function (e) {
         <p class="subtitle">好友房 · 六张牌两轮分牌</p>
         <div class="field">
           <label for="nickname-input">昵称</label>
-          <input id="nickname-input" maxlength="8" placeholder="输入昵称">
+          <input id="nickname-input" maxlength="8" placeholder="输入昵称（回车创建房间）" enterkeyhint="go">
         </div>
         <button id="btn-create" class="btn btn-primary btn-lg">创建房间</button>
         <div class="join-row">
-          <input id="room-input" maxlength="6" inputmode="numeric" placeholder="6位房间号" aria-label="6 位房间号">
+          <input id="room-input" maxlength="6" inputmode="numeric" placeholder="6 位房间号" aria-label="6 位房间号">
           <button id="btn-join" class="btn btn-quiet btn-lg">加入房间</button>
         </div>
         <div class="entry-links">
@@ -455,7 +455,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
              留一个永远点不到的房主按钮（因为别人一准备完就自动开了）
              比删掉更容易让人困惑：他只会看到一个一直灰着的「开始游戏」。 -->
         <div class="ghost-row">
-          <button id="btn-add-bot" class="btn btn-ghost hidden">补 AI 队友</button>
+          <button id="btn-add-bot" class="btn btn-ghost hidden">补 AI</button>
           <!-- 「结束本局」而不是「解散」：它不会把房间散掉，只是这一局作废进结算，
                房间号还在、大家还能开下一局。叫「解散」会让人以为点完就散伙了。 -->
           <button id="btn-dissolve" class="btn btn-ghost">结束本局</button>
@@ -525,18 +525,18 @@ window.addEventListener('beforeinstallprompt', function (e) {
              同排只是把主按钮缩短，不增加高度。 -->
         <div class="next-row">
           <button id="btn-next" class="btn btn-primary btn-lg">开始下一局</button>
-          <button id="btn-hold" class="btn-hold hidden" type="button"
+          <button id="btn-hold" class="btn btn-ghost btn-hold hidden" type="button"
                   aria-label="先别开牌，我等个人">等人</button>
         </div>
         <!-- 生成战绩图（分享）与本局过程（回放）并排：两个都是「看一眼」的事，
              不是主操作。以前它们各占一行全宽，加上下面那一行，
              一个结算页堆了 5 个按钮三种样子，重心全散了。 -->
         <div class="settle-actions-row">
-          <button id="btn-share" class="btn btn-lg">生成战绩图</button>
-          <button id="btn-replay" class="btn btn-lg">本局过程</button>
+          <button id="btn-share" class="btn btn-quiet btn-lg">生成战绩图</button>
+          <button id="btn-replay" class="btn btn-quiet btn-lg">本局过程</button>
         </div>
         <div class="settle-actions-row settle-actions-row--three">
-          <button id="btn-records" class="btn">查看战绩</button>
+          <button id="btn-records" class="btn btn-quiet">查看战绩</button>
           <!-- v121：自己说「这一把先不打」。
                必须是显式动作 —— 从 v121 起，「什么都不做」的含义变成了
                「我还在看，等我一下」，整桌会一直等。想歇一把要说出来。
@@ -566,7 +566,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
           </svg>
         </button>
         <div class="replay-head">
-          <h2 id="replay-title">本场过程</h2>
+          <h2 id="replay-title">本局过程</h2>
           <span id="replay-sub" class="replay-sub hidden"></span>
         </div>
         <div id="replay-body" class="replay-body"></div>
@@ -665,15 +665,15 @@ window.addEventListener('beforeinstallprompt', function (e) {
             <span class="rp-sum-label">累计净胜</span>
             <div class="rp-sum-value"><span id="rp-net">0</span><span class="rp-unit">分</span></div>
             <div class="rp-sum-meta">
-              <span class="rp-meta-item"><b id="rp-games">0</b> 场</span>
+              <span class="rp-meta-item"><b id="rp-games">0</b> 局</span>
               <i class="rp-vsep" aria-hidden="true"></i>
               <span class="rp-meta-item">胜率 <b id="rp-winrate">0%</b></span>
             </div>
           </section>
 
-          <!-- 中段：胜/负/平 三卡 + 纪录条。
+          <!-- 中段：胜/负/平 三卡 + 记录条。
                这里原本右边还挂着一张「牌风」五维雷达；雷达撤掉之后这一块恢复成
-               单列，三卡与纪录条各占整行 —— 390 宽下每张卡 207 设计像素，
+               单列，三卡与记录条各占整行 —— 390 宽下每张卡 207 设计像素，
                横屏 612 的栏宽下是 193，两朝向的卡几乎一样大，不用为朝向另调。 -->
           <div class="rp-kpi">
           <div class="rp-grid">
@@ -691,33 +691,33 @@ window.addEventListener('beforeinstallprompt', function (e) {
             </div>
           </div>
 
-          <!-- 纪录条：单场最高 / 最长连胜 / 最长连败（三项都是「历史最好」，语气比上面的场次统计更轻） -->
-          <section id="rp-bests" class="rp-bests" aria-label="纪录">
+          <!-- 记录条：单局最高 / 最长连胜 / 最长连败（三项都是「历史最好」，语气比上面的局数统计更轻） -->
+          <section id="rp-bests" class="rp-bests" aria-label="记录">
             <div class="rp-best">
-              <span class="rp-best-k">单场最高</span>
+              <span class="rp-best-k">单局最高</span>
               <span id="rp-best-net-wrap" class="rp-best-v"><b id="rp-best-net">0</b><i>分</i></span>
             </div>
             <div class="rp-best">
               <span class="rp-best-k">最长连胜</span>
-              <span class="rp-best-v up"><b id="rp-best-win">0</b><i>场</i></span>
+              <span class="rp-best-v up"><b id="rp-best-win">0</b><i>局</i></span>
             </div>
             <div class="rp-best">
               <span class="rp-best-k">最长连败</span>
-              <span class="rp-best-v down"><b id="rp-best-lose">0</b><i>场</i></span>
+              <span class="rp-best-v down"><b id="rp-best-lose">0</b><i>局</i></span>
             </div>
           </section>
           </div><!-- /rp-kpi -->
 
           <section class="rp-trend">
             <div class="rp-trend-head">
-              <span class="rp-trend-title">最近 10 场</span>
+              <span class="rp-trend-title">最近 10 局</span>
               <span class="rp-legend">
                 <span><i class="rp-lg rp-lg-win"></i>赢</span>
                 <span><i class="rp-lg rp-lg-lose"></i>输</span>
                 <span><i class="rp-lg rp-lg-flat"></i>平</span>
               </span>
             </div>
-            <div id="rp-trend-bar" class="rp-trend-bar" role="img" aria-label="最近 10 场"></div>
+            <div id="rp-trend-bar" class="rp-trend-bar" role="img" aria-label="最近 10 局"></div>
             <div class="rp-trend-axis"><span>更早</span><span>最新</span></div>
           </section>
           </div><!-- /rp-sumcol -->
@@ -727,12 +727,12 @@ window.addEventListener('beforeinstallprompt', function (e) {
             <h2>最近对局</h2>
             <span id="rp-list-count" class="rp-list-count">共 0 局</span>
           </div>
-          <!-- 人机局说明：只在真的有「含人机」的场次时出现（js 控制 hidden）。
+          <!-- 含 AI 对局说明：只在真的有「含 AI」的局数时出现（js 控制 hidden）。
                位置放在列表标题下面而不是页脚，因为它解释的是**下面这几行**：
-               列表里带「含人机」徽标的那些，就是这里说的场次。 -->
+               列表里带「含 AI」徽标的那些，就是这里说的局数。 -->
           <p id="rp-ai-note" class="rp-ai-note hidden">
-            <span class="rp-ai-chip">含人机</span>
-            <span id="rp-ai-note-text">人机对局不计入战绩与排行榜</span>
+            <span class="rp-ai-chip">含 AI</span>
+            <span id="rp-ai-note-text">含 AI 的对局不计入战绩与排行榜</span>
           </p>
           <ul id="records-list" class="rp-list"></ul>
           </div><!-- /rp-listcol -->
@@ -794,7 +794,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
       <div id="records-offline" class="rp-state rp-state--offline hidden" role="status" aria-live="polite">
         <div class="rp-state__body">
           <p class="rp-empty-title" data-rstate-title>现在没有网络</p>
-          <p class="rp-empty-sub" data-rstate-sub>先把这台设备上的记录给你看</p>
+          <p class="rp-empty-sub" data-rstate-sub>先把本机战绩给你看</p>
         </div>
         <button id="btn-records-reload" class="btn btn-ghost" type="button" data-act="reload">重新载入</button>
       </div>
@@ -812,7 +812,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
                内容区会跟着抖，而抖的那一下恰好发生在"读失败"的时候。 -->
           <button id="records-source-retry" class="btn btn-ghost btn-mini rp-src-retry hidden" type="button" data-act="retry">再读一次</button>
         </p>
-        <button id="btn-records-clear" class="rp-clear" type="button">清除记录</button>
+        <button id="btn-records-clear" class="rp-clear" type="button">清除战绩</button>
       </footer>
     </section>
 
@@ -850,7 +850,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
             <circle cx="11" cy="11" r="8.6" stroke="#B8C0CC" stroke-width="1.6" opacity=".8"/>
             <path d="M11 6.6v.2M11 10v5" stroke="#B8C0CC" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
           </svg>
-          按累计净胜排序 · 不含人机对局
+          按累计净胜排序 · 不含 AI 对局
         </p>
       </footer>
     </section>
@@ -877,7 +877,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
             <circle cx="11" cy="11" r="8.6" stroke="#B8C0CC" stroke-width="1.6" opacity=".8"/>
             <path d="M11 6.6v.2M11 10v5" stroke="#B8C0CC" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
           </svg>
-          牌型成就从上线当天开始记 · 不含人机对局
+          牌型成就从上线当天开始记 · 不含 AI 对局
         </p>
       </footer>
     </section>
@@ -893,7 +893,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
             <path d="M12 3.6 21.2 20H2.8L12 3.6Z" stroke="#A81C1C" stroke-width="1.8" stroke-linejoin="round"/>
             <path d="M12 9.4v4.6M12 16.8v.2" stroke="#A81C1C" stroke-width="1.9" stroke-linecap="round"/>
           </svg>
-          <span id="records-clear-count">当前 0 场记录将被删除</span>
+          <span id="records-clear-count">当前 0 局战绩将被删除</span>
         </div>
         <!-- 云端与云端必须一起清：只删本机不动服务器，就是「删了战绩排行榜还在」的成因 -->
         <label id="records-clear-cloud-wrap" class="rp-opt">
@@ -951,7 +951,7 @@ window.addEventListener('beforeinstallprompt', function (e) {
          role="dialog" aria-modal="true" aria-labelledby="rb-title">
       <div class="modal-card rb-card">
         <h2 id="rb-title">第一轮结束</h2>
-        <p id="rb-sub" class="rb-sub">本轮各家净得</p>
+        <p id="rb-sub" class="rb-sub">本轮各家净胜</p>
         <div id="rb-body" class="rb-body"></div>
         <p id="rb-next" class="rb-next"></p>
         <button id="btn-rb-close" class="btn btn-primary btn-lg">进入第二轮</button>
@@ -1323,34 +1323,34 @@ window.addEventListener('beforeinstallprompt', function (e) {
 
 <!-- 错误上报必须最先加载：game.js 里的启动异常也要能报到服务端。
      它不依赖任何其他模块，自己装 window.onerror / unhandledrejection。 -->
-<script src="./js/errorReport.js?v=20261119a" defer></script>
-<script src="./js/engine.js?v=20261119a" defer></script>
-<script src="./js/card.js?v=20261119a" defer></script>
-<script src="./js/config.js?v=20261119a" defer></script>
+<script src="./js/errorReport.js?v=20261119b" defer></script>
+<script src="./js/engine.js?v=20261119b" defer></script>
+<script src="./js/card.js?v=20261119b" defer></script>
+<script src="./js/config.js?v=20261119b" defer></script>
 <!-- 表情/短语清单：前端与服务端共用同一个文件（服务端 require 它做白名单）。
      必须早于 roomStore.js —— 传输层的 sendEmoji 会用它校验 id。 -->
-<script src="./js/emoji.js?v=20261119a" defer></script>
+<script src="./js/emoji.js?v=20261119b" defer></script>
 <!-- 成就：必须排在 stateMachine 之前 —— 状态机在结算时调 Ach.accumulate() 采集，
      顺序反了它拿到的是 undefined，表现为「成就永远 0」，不报错。 -->
-<script src="./js/achievements.js?v=20261119a" defer></script>
-<script src="./js/bestLine.js?v=20261119a" defer></script>
-<script src="./js/stateMachine.js?v=20261119a" defer></script>
-<script src="./js/authStore.js?v=20261119a" defer></script>
-<script src="./js/roomStore.js?v=20261119a" defer></script>
-<script src="./js/stats.js?v=20261119a" defer></script>
-<script src="./js/records.js?v=20261119a" defer></script>
-<script src="./js/sessionLog.js?v=20261119a" defer></script>
-<script src="./js/sfx.js?v=20261119a" defer></script>
-<script src="./js/slotLayout.js?v=20261119a" defer></script>
+<script src="./js/achievements.js?v=20261119b" defer></script>
+<script src="./js/bestLine.js?v=20261119b" defer></script>
+<script src="./js/stateMachine.js?v=20261119b" defer></script>
+<script src="./js/authStore.js?v=20261119b" defer></script>
+<script src="./js/roomStore.js?v=20261119b" defer></script>
+<script src="./js/stats.js?v=20261119b" defer></script>
+<script src="./js/records.js?v=20261119b" defer></script>
+<script src="./js/sessionLog.js?v=20261119b" defer></script>
+<script src="./js/sfx.js?v=20261119b" defer></script>
+<script src="./js/slotLayout.js?v=20261119b" defer></script>
 <!-- 头像预设（纯函数 + 48 款 SVG data URI）。必须早于 game.js：
      game.js 渲染座位时同步调 Avatar.img，晚一步就是 ReferenceError。 -->
-<script src="./js/avatar.js?v=20261119a" defer></script>
+<script src="./js/avatar.js?v=20261119b" defer></script>
 <!-- 圆桌闸门（纯函数）：这台机器上不上桌、按哪一档几何。
      必须在 game.js 之前：seatRingFlag() 渲染顶栏时同步调用全局 RingGate。 -->
-<script src="./js/ringGate.js?v=20261119a" defer></script>
+<script src="./js/ringGate.js?v=20261119b" defer></script>
 <!-- 座位环几何（纯函数）。同样必须在 game.js 之前：game.js 是同步 IIFE，
      渲染顶栏时直接读全局 SeatRing，晚一步就是 ReferenceError。 -->
-<script src="./js/seatRing.js?v=20261119a" defer></script>
+<script src="./js/seatRing.js?v=20261119b" defer></script>
 <!-- ★ 拆分出来的模块（v108）。顺序有意义，别重排：
      前三个是**立即执行**的（挂 window.LXW.utils / .cardView / .modalKit），
      后五个是**工厂**（挂 window.LXW.xxx = create），由 game.js 在自己合适的
@@ -1358,22 +1358,22 @@ window.addEventListener('beforeinstallprompt', function (e) {
      var 不提升值，创建太早会拿到 undefined。
 
      gameUtils 必须第一个：其余七个都从 window.LXW.utils 取 $ / el / esc。 -->
-<script src="./js/gameUtils.js?v=20261119a" defer></script>
-<script src="./js/cardView.js?v=20261119a" defer></script>
-<script src="./js/modalKit.js?v=20261119a" defer></script>
-<script src="./js/nextRoundHints.js?v=20261119a" defer></script>
-<script src="./js/undoBar.js?v=20261119a" defer></script>
-<script src="./js/historyKit.js?v=20261119a" defer></script>
-<script src="./js/accountView.js?v=20261119a" defer></script>
-<script src="./js/settleView.js?v=20261119a" defer></script>
-<script src="./js/seatSheetView.js?v=20261119a" defer></script>
+<script src="./js/gameUtils.js?v=20261119b" defer></script>
+<script src="./js/cardView.js?v=20261119b" defer></script>
+<script src="./js/modalKit.js?v=20261119b" defer></script>
+<script src="./js/nextRoundHints.js?v=20261119b" defer></script>
+<script src="./js/undoBar.js?v=20261119b" defer></script>
+<script src="./js/historyKit.js?v=20261119b" defer></script>
+<script src="./js/accountView.js?v=20261119b" defer></script>
+<script src="./js/settleView.js?v=20261119b" defer></script>
+<script src="./js/seatSheetView.js?v=20261119b" defer></script>
 <!-- 战绩页四态 + 错误三级（build-states v1）。纯函数模块，无注入项。
      必须早于 recordsView.js：后者 create() 时就要拿到 window.LXW.recordsState
      （拿不到会退回"只有 data/empty 两个态"的降级路径，界面看着正常，四态全丢）。 -->
-<script src="./js/recordsState.js?v=20261119a" defer></script>
-<script src="./js/recordsView.js?v=20261119a" defer></script>
-<script src="./js/achievementsView.js?v=20261119a" defer></script>
-<script src="./js/game.js?v=20261119a" defer></script>
+<script src="./js/recordsState.js?v=20261119b" defer></script>
+<script src="./js/recordsView.js?v=20261119b" defer></script>
+<script src="./js/achievementsView.js?v=20261119b" defer></script>
+<script src="./js/game.js?v=20261119b" defer></script>
 <!-- PWA Service Worker 注册（失败静默忽略，不影响正常游戏；PWA 需经 http(s) 服务，file:// 下不生效） -->
 <script>
   (function () {

@@ -93,7 +93,7 @@
       labels.push(WORD[kind] || '');
     }
     bar.setAttribute('aria-label', labels.length
-      ? ('最近 ' + labels.length + ' 场（左旧右新）：' + labels.join(' '))
+      ? ('最近 ' + labels.length + ' 局（左旧右新）：' + labels.join(' '))
       : '暂无对局');
   }
 
@@ -103,14 +103,14 @@
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
       var li = el('li', 'rp-row');
-      /* 含 AI 的场次：整行降一档亮度 + 一枚「含人机」徽标。
+      /* 含 AI 的场次：整行降一档亮度 + 一枚「含 AI」徽标。
        * 不隐藏这些行 —— 用户要的是「看得出来是人机对战」，
        * 藏起来等于让他以为那一把没打。 */
       if (r.ai) li.classList.add('is-ai');
       var left = el('div', 'rp-row-left');
       left.appendChild(el('span', 'rp-time', fmtTime(r.endedAt)));
       left.appendChild(el('span', 'rp-people', (r.playerCount || 0) + ' 人'));
-      if (r.ai) left.appendChild(el('span', 'rp-row-ai', '含人机'));
+      if (r.ai) left.appendChild(el('span', 'rp-row-ai', '含 AI'));
       var txt = netText(r.myNet);
       var net = el('span', 'rp-net ' + netCls(r.myNet), txt);
       if (txt.length > 4) net.style.fontSize = '34px'; // 超 4 位压缩字号（±999 以内不会发生）
@@ -126,7 +126,7 @@
          * 点进去发现只有最后一把，人会以为数据丢了。
          * 新记录带 sessionKey（整场），老记录只有单把 replay，两种都能开。 */
         var btn = el('button', 'rp-replay', '看回放');
-        btn.setAttribute('aria-label', '看回放：' + fmtTime(r.endedAt) + ' 这一场的牌面过程');
+        btn.setAttribute('aria-label', '看回放：' + fmtTime(r.endedAt) + ' 这一局的牌面过程');
         btn.type = 'button';
         btn.addEventListener('click', (function (rec) {
           return function () { openSavedReplay(rec); };
@@ -634,14 +634,14 @@
      * 只写「共 N 局」会让人数不清列表里的行，把口径一起写上。 */
     var humanRows = 0;
     for (var hr = 0; hr < rows.length; hr++) if (!rows[hr].ai) humanRows++;
-    $('#rp-list-count').textContent = '共 ' + st.games + ' 场'
-      + (humanRows < st.games ? ' · 列表近 ' + humanRows + ' 场' : '');
+    $('#rp-list-count').textContent = '共 ' + st.games + ' 局'
+      + (humanRows < st.games ? ' · 列表近 ' + humanRows + ' 局' : '');
     /* 人机局说明：数字来自服务端档案（aiGames），本地兜底模式退回数行数。
      *
-     * 芯片上已经写着「含人机」，所以正文不再重复那三个字 —— 早先是
-     * 「[含人机] 人机对局 2 局」，读起来是「含人机人机对局」。
+     * 芯片上已经写着「含 AI」，所以正文不再重复那三个字 —— 早先是
+     * 「[含 AI] AI 对局 2 局」，读起来是「含 AIAI 对局」。
      * aiRecent 同样只留 20 条，所以「N 局」可能多于列表里的行数；
-     * 那种情况下把「列表近 M 场」也写上（和上面人类场那句同一个说法）。 */
+     * 那种情况下把「列表近 M 局」也写上（和上面人类局那句同一个说法）。 */
     var aiCount = Number(st.aiGames) || (rows.length - humanRows);
     var aiRows = rows.length - humanRows;
     var aiNote = $('#rp-ai-note');
@@ -649,14 +649,14 @@
       var showAi = aiCount > 0;
       aiNote.classList.toggle('hidden', !showAi);
       if (showAi) {
-        /* 三处都写「场」：aiCount 是场数、aiRows 也是场数。
+        /* 量词契约：局 = 一整场对局，三处都写「局」。
          * 以前前半写「局」后半写「场」，同一行两个单位，读者会以为它们不是一回事。 */
-        $('#rp-ai-note-text').textContent = aiCount + ' 场'
-          + (aiRows < aiCount ? ' · 列表近 ' + aiRows + ' 场' : '')
+        $('#rp-ai-note-text').textContent = aiCount + ' 局'
+          + (aiRows < aiCount ? ' · 列表近 ' + aiRows + ' 局' : '')
           + ' · 不计入战绩与排行榜';
       }
     }
-    /* 纪录条：单场最高沿用净胜的红/绿/灰口径（负分也是真实的最好成绩，不藏起来）；
+    /* 记录条：单局最高沿用净胜的红/绿/灰口径（负分也是真实的最好成绩，不藏起来）；
      * 连胜/连败是次数，颜色写在 HTML 上（连胜红、连败绿），只换数字。 */
     var bestNet = st.bestNet || 0;
     $('#rp-best-net').textContent = netText(bestNet);
@@ -732,7 +732,7 @@
       if (!onlineNow) text = '只在这台设备上，换设备会丢';
       else if (cloudRecordsErrKey === 'err.data.malformed') text = errText('err.data.malformed').sub;
       else if (useCloud) text = '已保存到账号 · 换设备也在';
-      else if (cloudRecordsErr && cloudRecordsReady()) text = '账号数据暂时读不到，先显示这台设备上的记录';
+      else if (cloudRecordsErr && cloudRecordsReady()) text = '账号数据暂时读不到，先显示本机战绩';
       else text = '只在这台设备上，换设备会丢';
       src.textContent = text;
     }
@@ -777,8 +777,8 @@
    * 排行榜就是这个场景 —— 榜上的人不在我房间，playerNameOf() 问不到。 */
   function openProfile(pid, knownName) {
     if (!pid) return;
-    // AI 玩家没有云端档案，别弹一张空卡出去
-    if (String(pid).indexOf('bot_') === 0) { flash('AI 玩家没有战绩'); return; }
+    // AI 没有云端档案，别弹一张空卡出去
+    if (String(pid).indexOf('bot_') === 0) { flash('AI 没有战绩'); return; }
     if (typeof RoomStore === 'undefined' || !RoomStore.canQueryProfile || !RoomStore.canQueryProfile()) {
       flash('本地演示模式暂不支持查看他人战绩');   // 本地演示（无服务端）直接提示，不弹空卡
       return;
@@ -805,7 +805,7 @@
       renderProfileBody(res.profile);
     }).catch(function () {
       if (seq !== profileSeq) return;
-      renderProfileFail('网络异常，请稍后重试');
+      renderProfileFail('档案没读上来，关掉面板重新打开就能重读');
     });
   }
 
@@ -817,7 +817,7 @@
   function renderProfileFail(msg) {
     $('#profile-body').innerHTML = '<div class="pf-empty">'
       + '<p class="pf-empty-title">加载失败</p>'
-      + '<p class="pf-empty-sub">' + esc(msg || '请稍后重试') + '</p>'
+      + '<p class="pf-empty-sub">' + esc(msg || '档案没读上来，关掉面板重新打开') + '</p>'
       + '</div>';
   }
 
@@ -844,7 +844,7 @@
     if (!profile) return '';
     var cls = netCls(profile.totalNet);
     var html = '<div class="pf-stats">'
-      + '<div class="pf-stat"><b>' + (profile.games || 0) + '</b><span>场次</span></div>'
+      + '<div class="pf-stat"><b>' + (profile.games || 0) + '</b><span>局数</span></div>'
       + '<div class="pf-stat"><b>' + (profile.winRate || 0) + '%</b><span>胜率</span></div>'
       + '<div class="pf-stat ' + cls + '"><b>' + netText(profile.totalNet || 0) + '</b><span>累计净胜</span></div>'
       + '</div>'
@@ -894,7 +894,7 @@
     var body = $('#profile-body');
     if (!profile) {
       body.innerHTML = '<div class="pf-empty">' + PF_EMPTY_SVG
-        + '<p class="pf-empty-title">暂无战绩记录</p>'
+        + '<p class="pf-empty-title">暂无战绩</p>'
         + '<p class="pf-empty-sub">打完一局就会自动记下</p>'
         + '</div>';
       return;
@@ -951,7 +951,8 @@
 
     ctx.fillStyle = 'rgba(255,247,232,0.55)';
     ctx.font = '400 26px ' + FONT;
-    ctx.fillText('房间 ' + room.roomId + ' · 第 ' + (room.handSeq || 1) + ' 场', W / 2, 170);
+    /* handSeq 是「这一局里的第几把」，按契约写「把」，不写「场」。 */
+    ctx.fillText('房间 ' + room.roomId + ' · 第 ' + (room.handSeq || 1) + ' 把', W / 2, 170);
 
     // 我的净胜（大字）
     ctx.fillStyle = net > 0 ? '#FF5D5D' : (net < 0 ? '#3DDC84' : '#FFF7E8');
@@ -1216,7 +1217,7 @@
       var g = Math.max(0, Math.round(Number(packs[i].g) || 0));
       if (!seen[g]) { seen[g] = true; games++; }
     }
-    return games > 1 ? (games + ' 局 · ' + packs.length + ' 把') : ('整场 ' + packs.length + ' 把');
+    return games > 1 ? (games + ' 局 · ' + packs.length + ' 把') : ('整局 ' + packs.length + ' 把');
   }
 
   /* 弹窗显示之后再定位。roll 到「你点的那把」顶上，
@@ -1587,7 +1588,7 @@
         + '<span class="rank-no">' + medal + '</span>'
         + '<span class="rank-name">' + esc(r.nickname || '玩家')
         + (isMe ? '<i class="rank-you">我</i>' : '') + '</span>'
-        + '<span class="rank-meta">' + (r.games || 0) + ' 场 · ' + (r.winRate || 0) + '%</span>'
+        + '<span class="rank-meta">' + (r.games || 0) + ' 局 · ' + (r.winRate || 0) + '%</span>'
         + '<span class="rank-net ' + netCls(r.totalNet || 0) + '">' + netText(r.totalNet || 0) + '</span>'
         + (pid ? '<span class="rank-go" aria-hidden="true">›</span>' : '')
         + '</li>';
@@ -1796,7 +1797,7 @@
 
   /* ---------------------------- 清除战绩确认 ----------------------------
    * 关键点：默认**连云端一起清**。
-   * 用户点「清除记录」时想的是「把我这个号的数据清掉」；只删本机不动服务器，
+   * 用户点「清除战绩」时想的是「把我这个号的数据清掉」；只删本机不动服务器，
    * 回到排行榜还看得见战绩 —— 那正是这次要修的 bug。想保留云端可以取消勾选。 */
   function openClearModal() {
     var useCloud = cloudRecordsValid();
@@ -1805,7 +1806,7 @@
       : ((typeof Records !== 'undefined' && Records.available())
         ? Records.stats(pid || undefined) : EMPTY_STATS);
     if (!st.games) return;               // 无数据不弹（空态也看不到入口）
-    /* 确认时要写一句「将清除 N 场」，而这个 N 只能来自这里 ——
+    /* 确认时要写一句「将清除 N 局」，而这个 N 只能来自这里 ——
      * 确认那一刻再去算一次，可能因为云端档案刷新而变，会让文案和刚才看到的不一致。 */
     clearCount = st.games;
 
@@ -1815,7 +1816,7 @@
     if (box) { box.checked = canCloud; box.disabled = !canCloud; }
     if (wrap) wrap.classList.toggle('is-off', !canCloud);
 
-    $('#records-clear-count').textContent = '当前 ' + st.games + ' 场记录将被删除';
+    $('#records-clear-count').textContent = '当前 ' + st.games + ' 局战绩将被删除';
     showModalEl('records-clear-modal');
     pushModalState();
   }
@@ -1835,7 +1836,7 @@
 
       function finish(ok, err) {
         if (btn) btn.disabled = false;
-        if (!ok) { flash(err || '清除失败，请稍后再试'); return; }
+        if (!ok) { flash(err || '战绩没清掉，数据还在；回战绩页再点一次「清除战绩」'); return; }
         /* 云端清成功才动本机：反过来的话，一旦云端那步失败，
          * 用户会既丢了本机回放、又在排行榜上看见战绩，比原状更糟。 */
         try { Records.clear(pid || undefined); } catch (e) { /* 清不掉也不影响云端结果 */ }
@@ -1845,7 +1846,7 @@
         cloudRecordsAt = 0;
         cloudRecordsErr = '';
         renderRecords();                   // 同一次渲染内切空态，不做转场，避免闪一帧旧数据
-        flash(withCloud ? '战绩已清除 · 排行榜已同步' : '已清除这台设备上的记录');
+        flash(withCloud ? '战绩已清除 · 排行榜已同步' : '本机战绩已清除');
         if (withCloud) loadCloudRecords(true);   // 拿回清零后的档案（games=0 → 空态）
       }
 
@@ -1858,9 +1859,9 @@
            * 再取一次真正的清零后档案。多写一遍只会让人以为这份缓存被保留了。 */
           finish(true);
         } else {
-          finish(false, (res && res.error) || '清除失败，请稍后重试');
+          finish(false, (res && res.error) || '战绩没清掉，数据还在，再点一次清除');
         }
-      }).catch(function () { finish(false, '网络不太好，请稍后再试'); });
+      }).catch(function () { finish(false, '没连上服务器，战绩还在本机；回战绩页再点一次「清除战绩」'); });
     }
 
     /* 没有撤销条 = 老行为：立刻清。宁可清掉也不能点了没反应。 */
@@ -1871,11 +1872,11 @@
      * 所谓"撤销"只能恢复本机，排行榜上已经空了 —— 那种假撤销比不给更坏。
      * 详情见 pwa/js/undoBar.js 顶部的注释。 */
     undoBar.show({
-      msg: '将清除 ' + (n > 0 ? n + ' 场' : '全部') + '记录' + (withCloud ? '（含云端）' : '（仅本机）'),
+      msg: '将清除 ' + (n > 0 ? n + ' 局' : '全部') + '战绩' + (withCloud ? '（含云端）' : '（仅本机）'),
       action: '撤销',
       seconds: 5,
       onUndo: function () {
-        flash('已取消，记录还在');
+        flash('已取消，战绩还在');
       },
       onCommit: function (reason) {
         /* 五种 reason 都走到这里，而且都要**真清**：

@@ -92,7 +92,7 @@
 
     if (data && typeof data === 'object') {
       if (res.status >= 200 && res.status < 300 && data.ok !== false) return data;
-      return { ok: false, error: (data.error || '操作失败'), status: res.status };
+      return { ok: false, error: (data.error || '服务没受理，账号信息没变，再提交一次'), status: res.status };
     }
     return { ok: false, error: '服务返回异常（' + res.status + '）', status: res.status };
   }

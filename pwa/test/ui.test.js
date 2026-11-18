@@ -309,15 +309,15 @@ ok(gameJs.indexOf('function rankRowHtml(') >= 0, '榜单行有统一渲染函数
 ok(gameJs.indexOf('data.me') >= 0, '读取接口返回的 me（我的名次）');
 ok(gameJs.indexOf('mineInList') >= 0, '在榜内就不再重复贴一行');
 
-console.log('\n[我的战绩：纪录条（单场最高 / 最长连胜 / 最长连败）]');
-// 三项都是「历史最好」，用一块整面板 + 发丝线分栏，和上面三张独立的场次卡区分开。
+console.log('\n[我的战绩：纪录条（单局最高 / 最长连胜 / 最长连败）]');
+// 三项都是「历史最好」，用一块整面板 + 发丝线分栏，和上面三张独立的局数卡区分开。
 const recordsJs = fs.readFileSync(path.join(ROOT, 'js', 'records.js'), 'utf8');
 ok(html.indexOf('id="rp-bests"') >= 0, '有 #rp-bests 纪录条容器');
 ['rp-best-net', 'rp-best-win', 'rp-best-lose'].forEach(function (id) {
   ok(html.indexOf('id="' + id + '"') >= 0, '纪录条里有 #' + id);
 });
-ok(html.indexOf('>单场最高<') >= 0 && html.indexOf('>最长连胜<') >= 0 && html.indexOf('>最长连败<') >= 0,
-  '三个标签文案齐全（单场最高 / 最长连胜 / 最长连败）');
+ok(html.indexOf('>单局最高<') >= 0 && html.indexOf('>最长连胜<') >= 0 && html.indexOf('>最长连败<') >= 0,
+  '三个标签文案齐全（单局最高 / 最长连胜 / 最长连败）');
 ok(/\.rp-bests\s*\{[^}]*grid-template-columns:\s*repeat\(3,/.test(recordsCss), '纪录条是三等分栅格');
 ok(/\.rp-bests\s*\{[^}]*rgba\(245, 193, 92, 0\.16\)/.test(recordsCss), '金色描边与「我的战绩」标题同色系');
 ok(/\.rp-best\s*\+\s*\.rp-best\s*\{[^}]*inset 1px 0 0/.test(recordsCss), '栏与栏之间是发丝线（不是三张独立卡）');
@@ -327,9 +327,9 @@ ok(/\.rp-best-v\.up\s*\{[^}]*var\(--up-red\)/.test(recordsCss) && /\.rp-best-v\.
 ok(recordsJs.indexOf('longestLoseStreak') >= 0, '数据层算出最长连败');
 ok(gameJs.indexOf("$('#rp-best-win').textContent = st.longestStreak") >= 0, '渲染时写入最长连胜');
 ok(gameJs.indexOf("$('#rp-best-lose').textContent = st.longestLoseStreak") >= 0, '渲染时写入最长连败');
-ok(gameJs.indexOf("$('#rp-best-net').textContent = netText(bestNet)") >= 0, '单场最高复用 netText（带 +/- 号）');
+ok(gameJs.indexOf("$('#rp-best-net').textContent = netText(bestNet)") >= 0, '单局最高复用 netText（带 +/- 号）');
 ok(gameJs.indexOf("$('#rp-best-net-wrap').className = 'rp-best-v ' + netCls(bestNet)") >= 0,
-  '单场最高的颜色跟着数值走（+ 红 / - 绿 / 0 灰）');
+  '单局最高的颜色跟着数值走（+ 红 / - 绿 / 0 灰）');
 
 console.log('\n[换手不串场：草稿按「场次:把:轮」作废]');
 // 只用 round 判重会在换手时撞键（round 回到 1），导致牌区留着上一把的牌、点不动也放不进。
@@ -368,7 +368,8 @@ ok(styleCss.indexOf('#btn-auth-submit') >= 0, '主按钮满宽（和「创建房
 console.log('\n[对局页顶部：桌沿（对手头像条 + 我的座位）]');
 // 旧版：串灰字 + 金分隔线 + 原生滚动条；座位卡里「✓已提交」气泡和「●已提交」文字说两遍。
 // 现在座位直接贴在毡面上，状态改用「头像描边色 + 角标符号」，顶栏从 184 压到 ~153。
-ok(/\.game-top\s*\{[^}]*border-radius:\s*24px/.test(styleCss), '顶部是一块圆角玻璃面板（不是分隔线 + 灰字）');
+// P7：圆角已收敛到 --r-*，24px/999px 改为 token（判据仍是"面板圆角 / 座位胶囊"）
+ok(/\.game-top\s*\{[^}]*border-radius:\s*var\(--r-modal\)/.test(styleCss), '顶部是一块圆角玻璃面板（不是分隔线 + 灰字）');
 ok(/\.game-top\s*\{[^}]*linear-gradient\(180deg, rgba\(255, 255, 255, 0\.09\)/.test(styleCss),
   '面板用与首页入口同一套顶部高光渐变');
 ok(styleCss.indexOf('.gt-phase') >= 0 && styleCss.indexOf('.gt-sub') >= 0, '主信息与次要信息分成两级（阶段大、把数/房号小）');
@@ -379,7 +380,7 @@ ok(/\.gt-opps\s*\{[^}]*scrollbar-width:\s*none/.test(styleCss), '座位条隐藏
 ok(/\.gt-opps::-webkit-scrollbar\s*\{[^}]*display:\s*none/.test(styleCss), '座位条隐藏原生滚动条（WebKit）');
 ok(styleCss.indexOf('.gt-opps.can-scroll') >= 0, '内容超宽时仍有右缘渐隐提示可滑');
 // 座位搬到桌面上：没有卡片底，只有头像 + 名字 + 分数
-ok(/\.gt-opp\s*\{[^}]*border-radius:\s*999px/.test(styleCss), '座位是贴在桌沿上的胶囊，不再是独立卡片');
+ok(/\.gt-opp\s*\{[^}]*border-radius:\s*var\(--r-pill\)/.test(styleCss), '座位是贴在桌沿上的胶囊，不再是独立卡片');
 ok(/\.gt-opp\s*\{[^}]*background:\s*rgba\(0, 0, 0, 0\.22\)/.test(styleCss), '座位底色只压暗一点，露出毡面');
 ok(/\.gt-opp\s*\{[^}]*min-width:\s*150px/.test(styleCss), '座位有足够最小宽度（4 个字的昵称不被截断）');
 ok(/\.gt-opp\s*\{[^}]*flex:\s*1 1 0/.test(styleCss), '座位自适应：2 人局宽一些、3 人等分、更多人横滑');

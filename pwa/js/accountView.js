@@ -84,7 +84,7 @@
 
   function showAuthError(msg) {
     var box = $('#auth-err');
-    box.textContent = msg || '操作失败';
+    box.textContent = msg || '这次没登上去，账号信息没变，再提交一次';
     box.classList.remove('hidden');
   }
   function hideAuthError() { $('#auth-err').classList.add('hidden'); }
@@ -140,7 +140,7 @@
       btn.classList.remove('is-busy');
     }
     if (!res || !res.ok) {
-      showAuthError((res && res.error) || '登录失败，稍后再试');
+      showAuthError((res && res.error) || '没登录上，账号数据没变；核对密码后再点「登录」');
       Sfx.play('error');
       return;
     }
@@ -292,7 +292,7 @@
     err.classList.add('hidden');
     var r = await AuthStore.setAvatar(id);
     if (!r || !r.ok) {
-      err.textContent = (r && r.error) || '换不了，请稍后再试';
+      err.textContent = (r && r.error) || '头像没换上，原来的还在；再点一次这张头像';
       err.classList.remove('hidden');
       Sfx.play('error');
       return;
@@ -369,7 +369,7 @@
     }
     var r = await AuthStore.uploadPhoto(blob);
     if (!r || !r.ok) {
-      err.textContent = (r && r.error) || '上传失败，请稍后再试';
+      err.textContent = (r && r.error) || '照片没传上去，头像没变；换张照片再传一次';
       err.classList.remove('hidden');
       Sfx.play('error');
       return;
@@ -386,7 +386,7 @@
     var r = await AuthStore.setAvatar(AuthStore.avatar() || '');
     if (!r || !r.ok) {
       var err = $('#av-err');
-      err.textContent = (r && r.error) || '换不了，请稍后再试';
+      err.textContent = (r && r.error) || '头像没换上，原来的还在；再点一次这张头像';
       err.classList.remove('hidden');
       return;
     }
@@ -426,7 +426,7 @@
     try { res = await AuthStore.changePassword(oldPw, newPw); }
     finally { btn.disabled = false; btn.classList.remove('is-busy'); }
 
-    if (!res || !res.ok) { fail((res && res.error) || '修改失败，稍后再试'); Sfx.play('error'); return; }
+    if (!res || !res.ok) { fail((res && res.error) || '密码没改成，原来的还能用；核对后再点一次「确定」'); Sfx.play('error'); return; }
     closePwdModal();
     flash('密码已修改');
     Sfx.play('submit');
@@ -507,18 +507,18 @@
     var gonePid = recordsPid();
     askConfirm(
       '删除账号',
-      '账号「' + name + '」及其全部战绩、本机记录和回放会被永久删除，无法恢复。'
+      '账号「' + name + '」及其全部战绩、回放和本机副本会被永久删除，无法恢复。'
       + '重新注册会是一个全新的号。'
       + '你参与过的对局会留在其他玩家的设备上，他们下次打开该回放时其中的名字会被清理。'
       + '为确认是你本人，请输入登录密码。',
       async function (password) {
         var res = await AuthStore.deleteAccount(password);
-        if (!res || !res.ok) { flash((res && res.error) || '删除失败，请稍后重试'); Sfx.play('error'); return; }
+        if (!res || !res.ok) { flash((res && res.error) || '账号没删掉，战绩还在，重新输一次密码再删'); Sfx.play('error'); return; }
         leaveAccountState(true, gonePid);   // ← purge：连本机战绩与整场回放一起清
         flash('账号已删除');
         gotoAuth();
       },
-      { busyText: '删除中…', secret: true }
+      { busyText: '删除中…', secret: true, tone: 'danger' }
     );
   }
 

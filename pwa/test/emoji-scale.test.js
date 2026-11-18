@@ -48,7 +48,7 @@ console.log('\n[1] 尺寸必须跟着 --emo-k 走');
   const ph = rule('.emoji-fly.is-phrase .emoji-pop');
   ok(/font-size:\s*calc\(24px \* var\(--emo-k/.test(ph), '★ 短语字号 = 24px × --emo-k（用户报的就是这一条）', ph.slice(0, 160));
   ok(/padding:\s*calc\(10px \* var\(--emo-k/.test(ph), '内边距同步（只放大字号会让气泡显得挤）');
-  ok(/border-radius:\s*calc\(18px \* var\(--emo-k/.test(ph), '圆角同步（不同步会变成「字很大、角很尖」）');
+  ok(/border-radius:\s*calc\(var\(--r-card\) \* var\(--emo-k/.test(ph), '圆角同步（P7 起基准值走 --r-card，缩放系数仍是 --emo-k）');
 
   const wrap = rule('.emoji-fly.is-phrase');
   ok(/max-width:\s*min\(calc\(460px \* var\(--emo-k/.test(wrap),

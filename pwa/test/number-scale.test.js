@@ -84,6 +84,9 @@ const NUMERIC_SELECTORS = [
   /(^|\s)\.rp-list-count$/,
   /\.rp-sum-meta\s+b$/,
   /(^|\s)\.settle-net$/,
+  /* P0-1：冠军块净胜和名次表冠军是同一个数，以前 30px 金色是「第二套答案」，
+   * 因为它没进这张白名单，梯外值一直没人管。 */
+  /(^|\s)\.sc-net$/,
   /(^|\s)\.settle-score$/,
   /\.rank-row\s+\.rank-no$/,
   /\.rank-row\s+\.rank-net$/,
@@ -185,6 +188,23 @@ head('[3] 结算页跨朝向一致');
   ok(wideChamp.length === 1, '找得到横屏冠军净胜');
   eq(champ[0] && /var\(--num-2\)/.test(champ[0].body), true, '★ 竖屏冠军走 T2');
   eq(wideChamp[0] && /var\(--num-2\)/.test(wideChamp[0].body), true, '★★ 横屏冠军同档（以前横屏 40 < 竖屏 48）');
+  /* P0-1：同屏两个地方渲染同一个净胜，字号与颜色都只能有一个答案。
+   * 这里直接比声明值而不是"差不多大"——30px 不是 48px 的近似，是另一套口径。 */
+  const scNet = find('.sc-net');
+  const scName = find('.sc-name');
+  eq(scNet.length, 1, '找得到冠军块净胜 .sc-net');
+  const fontSizeOf = (b) => { const m = /font-size\s*:\s*([^;}]+)/.exec(b ? b.body : ''); return m ? m[1].trim() : null; };
+  eq(fontSizeOf(scNet[0]), fontSizeOf(champ[0]), '★★ 冠军块净胜与名次表冠军 computed 取值同档（改回 30px 必须红）',
+    fontSizeOf(scNet[0]) + ' vs ' + fontSizeOf(champ[0]));
+  eq(fontSizeOf(scNet[0]), 'var(--num-2)', '★ 冠军块净胜走 T2');
+  eq(fontSizeOf(scName[0]), 'var(--num-3)', '★ 名字低一档：名次表 28<48，冠军块 32<48，层级方向一致');
+  const settleJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'settleView.js'), 'utf8');
+  ok(/el\('p',\s*'sc-net '\s*\+\s*netCls\(top\.score\)/.test(settleJs),
+    '★★ 冠军净胜的颜色也走 up/down/flat 三态（不再金/涨跌两套答案）');
+  for (const cls of ['up', 'down', 'flat']) {
+    const r = find('.sc-net.' + cls);
+    eq(r.length, 1, '有 .sc-net.' + cls + ' 颜色规则');
+  }
   /* 反向：横屏那三个选择器必须拆开 —— 名字是文字可以压，数字不许跟着压。
    * 以前写成 `.wide-stage .settle-name, .wide-stage .settle-score, .wide-stage .settle-net { 28px }`，
    * 于是净胜被压到"单位档"，和旁边的「分」一样大。 */
@@ -262,6 +282,65 @@ head('[5] §3.2 条件 ↔ 几何断言对照（320×568 三处对齐）');
     '★★ CI 的 run: 块里真调用了 probe-numbers.js 320 568（核到调用点，AC-NB-24）');
   ok(/ONLY\.split\(','\)/.test(wf), '★ 320 分片自检按 ONLY 期望数取（R5）');
   ok(!/only:\s*'[^']*×/.test(wf), '★ only 值里没有全角 ×（空列表 exit 2 的坑）');
+}
+
+/* =================== [6] 文字层阶梯（P1-P6）=================== */
+head('[6] 结算页文字层：22/30 并档，锁 --fs-* 四档');
+{
+  const css = readAll();
+  const styleBlocks = blocks(css['style.css']);
+  const find = (sel) => styleBlocks.filter((b) => b.sel === sel);
+  const fontSizeOf = (b) => { const m = /font-size\s*:\s*([^;}]+)/.exec(b ? b.body : ''); return m ? m[1].trim() : null; };
+
+  /* 文字层的四档取值刻意复用 numeric 的中间四档，但用独立 token：
+   * 写文字的引用 --fs-*，写数的引用 --num-*，任一侧调档不误伤另一侧。 */
+  const wantFs = {
+    '--fs-1': 'var(--num-3)', '--fs-2': 'var(--num-u1)',
+    '--fs-3': 'var(--num-4)', '--fs-4': 'var(--num-u2)'
+  };
+  const root = /:root\s*\{([\s\S]*?)\n\}/.exec(css['style.css']);
+  ok(!!root, '（前置）找得到 :root');
+  const rootBody = root ? root[1] : '';
+  for (const [k, v] of Object.entries(wantFs)) {
+    const m = new RegExp('\\' + k + '\\s*:\\s*([^;]+);').exec(rootBody);
+    eq(m ? m[1].trim() : null, v, k + ' = ' + v + '（删档/改成 22px 必须红）');
+  }
+  ok(/想加档先改文档/.test(rootBody), '★ 字号阶梯带着"想加档先改文档"纪律（不许 CSS 里现编）');
+
+  /* 结算页同屏的文字层：此前 22px 的 .sr-hint/.sc-k/.sc-gap/.settle-go 与
+   * 24/20 混排；30px 的 .sc-net 已在 P0-1 归位到 var(--num-2)，这里守文字层。 */
+  const TEXT_SELECTORS = [
+    '.settle-go', '.settle-recheck', '.settle-recheck .sr-hint', '.settle-tip',
+    '.settle-ai-note', '.sc-k', '.sc-gap', '.settle-reset-note', '.settle-wait'
+  ];
+  const bad = [];
+  for (const sel of TEXT_SELECTORS) {
+    const hits = find(sel);
+    if (hits.length !== 1) { bad.push(sel + ' 声明数=' + hits.length); continue; }
+    const v = fontSizeOf(hits[0]);
+    if (!/^var\(--fs-[1-4]\)$/.test(v || '')) bad.push(sel + ' → ' + v);
+  }
+  eq(bad.length, 0, '★★ 9 个文字层选择器全部走 --fs-*（把任一改回 22px 必须红）', bad.join(' | '));
+  eq(TEXT_SELECTORS.length, 9, '★ 文字层白名单不是空的（9 条）');
+
+  /* 反向：这些选择器里不许再出现 22px/30px 现编值 */
+  const drift = [];
+  for (const sel of TEXT_SELECTORS) {
+    const v = fontSizeOf(find(sel)[0]);
+    if (/^(22|30)px$/.test(v || '')) drift.push(sel + ' → ' + v);
+  }
+  eq(drift.length, 0, '★★ 22px/30px 在文字层归零', drift.join(' | '));
+
+  /* 有意的梯外项写进断言，防止后来者"顺手统一"改错：
+   * 头像首字母 .settle-rank 随直径走（72px 圆配 32px），不是排版字号；
+   * 旁听卡 .sp-title(40) / .sp-tip(26) 与 .ls 横屏缩放档是另一套密度，
+   * 并档会挤掉本来只够三行的横屏 —— 保守保留，见 p1-fix-log.md 取舍节。 */
+  const rankBot = find('.settle-rank.is-bot');
+  ok(rankBot.length === 1 && /30px/.test(rankBot[0].body),
+    '★ 头像首字母 .settle-rank.is-bot 的 30px 是几何值，刻意保留');
+  const spTitle = find('.sp-title');
+  ok(spTitle.length === 1 && /40px/.test(spTitle[0].body),
+    '★ 旁听卡标题 40px 刻意保留（横屏另有 .ls 缩放档，不硬压）');
 }
 
 /* =================== 收尾 =================== */

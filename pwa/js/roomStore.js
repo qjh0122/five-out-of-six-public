@@ -307,7 +307,7 @@
         if (res.ok) publish(roomId, res.room);
         return res;
       },
-      /* 本地演示模式没有服务端，也就没有 AI 玩家 */
+      /* 本地演示模式没有服务端，也就没有 AI */
       addBot: function () {
         return { ok: false, error: '本地演示模式不支持 AI 补位' };
       },
@@ -551,20 +551,26 @@
     });
   }
 
+    /* 这一层的 Error 文案**会原样弹到玩家脸上**：各区区的请求都 `catch(e) → {ok:false,error:e.message}`
+     * → game.js 的 flashRoomError → flash()。所以这里不许写「连接失败 / 请求超时」这种裸技术短语
+     * （玩家既不知道发生了什么，也不知道该干什么），一律写成「后果 + 具体动词」。
+     * 短语本身列进了 ui-copy-consistency 的禁用面，回潮会被守卫抓住。 */
+    var NET_FAIL = '没连上服务器，这步没送到；房间没变化，再点一次';
+
     function ensureConnected() {
       return new Promise(function (resolve, reject) {
         if (socket && socket.readyState === 1) return resolve(socket);
         if (socket && socket.readyState === 0) { // 正在连接
           socket.addEventListener('open', function () { resolve(socket); }, { once: true });
-          socket.addEventListener('error', function () { reject(new Error('连接失败')); }, { once: true });
+          socket.addEventListener('error', function () { reject(new Error(NET_FAIL)); }, { once: true });
           return;
         }
         var s;
         try { s = new WebSocket(wsUrl()); }
-        catch (e) { reject(new Error('无法建立连接')); return; }
+        catch (e) { reject(new Error(NET_FAIL)); return; }
         socket = s;
         disconnected = false;
-        var timeout = setTimeout(function () { reject(new Error('连接超时')); }, 8000);
+        var timeout = setTimeout(function () { reject(new Error('一直没连上服务器，这步没送到；房间没变化，再点一次')); }, 8000);
         s.addEventListener('open', function () {
           /* 先出示登录令牌。服务端此后按令牌认定「我是谁」，
            * 请求体里的 playerId 一律不采信——老版本正是靠它冒充别人的。 */
@@ -574,7 +580,7 @@
           } catch (e) { /* 令牌取不到就由服务端拒绝，不在这里拦 */ }
           clearTimeout(timeout); startHeartbeat(); resolve(s);
         });
-        s.addEventListener('error', function () { clearTimeout(timeout); reject(new Error('连接失败')); });
+        s.addEventListener('error', function () { clearTimeout(timeout); reject(new Error(NET_FAIL)); });
         s.addEventListener('message', function (ev) { handleMessage(ev.data); });
         s.addEventListener('close', function () {
           /* 只处理「当前这条连接」的关闭。
@@ -611,7 +617,7 @@
         if (p) { delete pending[data.reqId]; p.resolve(data.payload || {}); }
       } else if (data.type === 'error') {
         var q = pending[data.reqId];
-        if (q) { delete pending[data.reqId]; q.reject(new Error((data.payload && data.payload.error) || '请求失败')); }
+        if (q) { delete pending[data.reqId]; q.reject(new Error((data.payload && data.payload.error) || '这步没成功，房间没变化，再点一次')); }
         else if (data.reqId != null) {
           /* 有 reqId，但本地已经没有对应请求了 —— 这是一个**迟到的回包**：
            * request() 8 秒超时会把它从 pending 里删掉，服务端随后才回。
@@ -688,7 +694,8 @@
         var reqId = ++reqSeq;
         return new Promise(function (resolve, reject) {
           var timer = setTimeout(function () {
-            if (pending[reqId]) { delete pending[reqId]; reject(new Error('请求超时')); }
+            /* 连接是通的，只是这条请求 8 秒没回包 —— 对玩家来说是同一件事：没送到、要重来。 */
+            if (pending[reqId]) { delete pending[reqId]; reject(new Error('服务器没应声，这步没送到；房间没变化，再点一次')); }
           }, 8000);
           pending[reqId] = {
             resolve: function (v) { clearTimeout(timer); resolve(v); },
@@ -832,7 +839,7 @@
           .then(function () { return { ok: true }; })
           .catch(function (e) { return { ok: false, error: e.message }; });
       },
-      /* 房主补一个 AI 玩家（仅等待阶段可用） */
+      /* 房主补一个 AI（仅等待阶段可用） */
       addBot: function () {
         return request({ type: 'addBot' })
           .then(function (res) { return { ok: true, botId: (res && res.botId) || null }; })

@@ -579,40 +579,40 @@
      *   · 计数型（一场一次的那种）—— need 是「发生几次才点亮」，卡片写次数。
      */
     { id: 'first', series: 'record', rarity: 'normal', name: '第一次',
-      desc: '你的第一场打完了。往后还有很多场',
+      desc: '你的第 1 局打完了。往后还有很多局',
       cur: function (c) { return g(c, 'games'); }, need: 1, statKey: 'games' },
     { id: 'regular', series: 'record', rarity: 'normal', name: '常客', mode: 'progress',
-      desc: '十场。牌桌上开始有人认得你的名字',
+      desc: '10 局。牌桌上开始有人认得你的名字',
       cur: function (c) { return g(c, 'games'); }, need: 10, statKey: 'games' },
     /* v116 补的一档：10 场到 100 场之间原本有 90 场的空窗，
      * 中间没有任何一张卡会动 —— 玩家会以为系统不记了。 */
     { id: 'familiar', series: 'record', rarity: 'normal', name: '熟面孔', mode: 'progress',
-      desc: '五十场。同一个房间里，大半的名字你已经见过',
+      desc: '50 局。同一个房间里，大半的名字你已经见过',
       cur: function (c) { return g(c, 'games'); }, need: 50, statKey: 'games' },
     { id: 'veteran', series: 'record', rarity: 'epic', name: '老油条', mode: 'progress',
-      desc: '一百场。你比大多数人都懂这套规则是怎么转的',
+      desc: '100 局。你比大多数人都懂这套规则是怎么转的',
       cur: function (c) { return g(c, 'games'); }, need: 100, statKey: 'games' },
     /* v116 补的超长线：100 场之后原本就没有目标了。
      * 200 场按线上目前的进度只有 1 个人接近 —— 它就是给「还想往上打」的人留的。 */
     { id: 'ironman', series: 'record', rarity: 'legend', name: '铁人', mode: 'progress',
-      desc: '两百场。到这个份上，牌桌已经是日常的一部分',
+      desc: '200 局。到这个份上，牌桌已经是日常的一部分',
       cur: function (c) { return g(c, 'games'); }, need: 200, statKey: 'games' },
     { id: 'streak5', series: 'record', rarity: 'rare', name: '势不可挡', mode: 'progress',
-      desc: '连赢五场。中间任何一场失手都得从头再来',
+      desc: '连赢 5 局。中间任何一局失手都得从头再来',
       cur: function (c) { return g(c, 'streak'); }, need: 5, statKey: 'streak' },
     { id: 'streak10', series: 'record', rarity: 'legend', name: '十连胜', mode: 'progress',
-      desc: '连赢十场。这已经不是运气能解释的了',
+      desc: '连赢 10 局。这已经不是运气能解释的了',
       cur: function (c) { return g(c, 'streak'); }, need: 10, statKey: 'streak' },
     /* v116 补的加档：十连胜在线上一个人都没有，但 8 连的确实存在 ——
      * 十五连是给「真的打出过那种手感」的人留的记号，不是给所有人留的台阶。 */
     { id: 'streak15', series: 'record', rarity: 'legend', name: '十五连胜', mode: 'progress',
-      desc: '连赢十五场。到这一步，对手开始怀疑牌是不是有记忆',
+      desc: '连赢 15 局。到这一步，对手开始怀疑牌是不是有记忆',
       cur: function (c) { return g(c, 'streak'); }, need: 15, statKey: 'streak' },
     { id: 'lose5', series: 'record', rarity: 'rare', name: '背到极点', mode: 'progress',
-      desc: '连输五场。输到这个份上，反而没什么好怕的了',
+      desc: '连输 5 局。输到这个份上，反而没什么好怕的了',
       cur: function (c) { return g(c, 'loseStreak'); }, need: 5, statKey: 'loseStreak' },
     { id: 'lose10', series: 'record', rarity: 'legend', name: '衰神附体', mode: 'progress',
-      desc: '连输十场。牌不认人，认的是这几天你碰过谁',
+      desc: '连输 10 局。牌不认人，认的是这几天你碰过谁',
       cur: function (c) { return g(c, 'loseStreak'); }, need: 10, statKey: 'loseStreak' },
     /* 单场之王：`bestNet` 这个字段从有成就系统那天起就没人用过（白白闲置）。
      *
@@ -621,19 +621,19 @@
      * 线上最高 142（全操），目前 0 人够到，是留给「一把打穿全桌」的那种局。
      * 两条的区别是「发生过几次」vs「单场上限有多高」，不是同一根轴上的一高一低。 */
     { id: 'bigwin', series: 'record', rarity: 'legend', name: '单场之王',
-      desc: '一场里净胜 150 分以上。这一场打完，整桌的分基本都在你手里',
+      desc: '一局里净胜 150 分以上。这一局打完，整桌的分基本都在你手里',
       cur: function (c) { return g(c, 'bestNet'); }, need: 150, statKey: 'bestNet' },
     { id: 'windfall', series: 'record', rarity: 'rare', name: '一夜暴富',
-      desc: '一场打完，净胜超过 100 分。这一场基本是你一个人的',
+      desc: '一局打完，净胜超过 100 分。这一局基本是你一个人的',
       cur: function (c) { return g(c, 'r12'); }, need: 1, countKey: 'r12' },
     { id: 'comeback', series: 'record', rarity: 'rare', name: '翻身农奴',
-      desc: '连输五场以上之后赢一场。赢一场就够了，记的是次数',
+      desc: '连输 5 局以上之后赢 1 局。赢 1 局就够了，记的是次数',
       cur: function (c) { return g(c, 'r7'); }, need: 1, countKey: 'r7' },
     { id: 'luckyonly', series: 'record', rarity: 'legend', name: '你咋这幸',
-      desc: '一场打完，全场只有你一个人正分。别人一分没赢到，全在你手里',
+      desc: '一局打完，全场只有你一个人正分。别人一分没赢到，全在你手里',
       cur: function (c) { return g(c, 'r9'); }, need: 1, countKey: 'r9' },
     { id: 'unluckyonly', series: 'record', rarity: 'epic', name: '我咋这霉',
-      desc: '一场打完，全场只有你一个人负分。牌不认人，这一场真不认你',
+      desc: '一局打完，全场只有你一个人负分。牌不认人，这一局真不认你',
       cur: function (c) { return g(c, 'r10'); }, need: 1, countKey: 'r10' }
   ];
 

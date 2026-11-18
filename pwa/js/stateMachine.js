@@ -1605,7 +1605,7 @@
         ok: false,
         code: GATE_CODES.NEED_PLAYERS,
         error: joiners.length <= 1
-          ? '现在只有你一个人能上场，跳过他也开不了 —— 补个 AI 队友，或者等他回来'
+          ? '现在只有你一个人能上场，跳过他也开不了 —— 补个 AI，或者等他回来'
           : '人不够，跳过他也开不了'
       };
     }

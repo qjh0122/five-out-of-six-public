@@ -501,7 +501,7 @@ summary { cursor: pointer; font-size: 13px; color: var(--gold-light); padding: 6
       res = await fetch(url, { method: method, headers: headers, body: payload, cache: 'no-store' });
       try { data = await res.json(); } catch (e) { /* 非 JSON 响应，下面按状态码兜底 */ }
     } catch (e) {
-      return { ok: false, error: '网络异常，请检查连接后重试', network: true };
+      return { ok: false, error: '连不上后台服务，检查网络后再发一次', network: true };
     }
     if (!data) return { ok: false, error: '服务返回异常（' + res.status + '）' };
     if (!res.ok) return { ok: false, error: data.error || ('HTTP ' + res.status), jobId: data.jobId };
@@ -664,7 +664,7 @@ summary { cursor: pointer; font-size: 13px; color: var(--gold-light); padding: 6
     if (kind === 'toggle') {
       var next = !u.disabled;
       var r3 = await call('POST', '/admin/disable', { playerId: pid, disabled: next });
-      setStatus(r3.ok ? (next ? '已停用「' + u.account + '」，他现在登不进来' : '已恢复「' + u.account + '」') : (r3.error || '操作失败'), !r3.ok);
+      setStatus(r3.ok ? (next ? '已停用「' + u.account + '」，他现在登不进来' : '已恢复「' + u.account + '」') : (r3.error || '这步没成功，用户状态没变，再点一次'), !r3.ok);
       return load();
     }
 

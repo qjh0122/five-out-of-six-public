@@ -167,7 +167,7 @@ head('[3] reportBug 真的会把异常交出去，且不说谎');
     let seen = null;
     let flashes = [];
     const bug = make((kind, msg, extra) => { seen = { kind, msg, extra }; }, flashes);
-    bug('submitGroups', new TypeError('x is not a function'), '交牌出了点问题，已经记下了');
+    bug('submitGroups', new TypeError('x is not a function'), '交牌后的收尾出了错，牌可能已经交上去了；错误已经记下了，先回房间看一眼，别急着重交');
     ok(!!seen, '★ 异常被交给上报（不是只 flash 一句就算了）');
     eq(seen && seen.kind, 'catch', 'kind 默认是 catch');
     ok(seen && /submitGroups/.test(seen.msg), '★ 消息里带上了位置（否则线上只知道"有个错"）', seen && seen.msg);
@@ -184,8 +184,8 @@ head('[3] reportBug 真的会把异常交出去，且不说谎');
     /* ③ 自定义文案要能覆盖（交牌那句要说「可能已经提交」） */
     flashes = [];
     const bug3 = make(() => {}, flashes);
-    bug3('submitGroups', new Error('boom'), '交牌出了点问题，已经记下了');
-    eq(flashes[0], '交牌出了点问题，已经记下了', '自定义文案生效');
+    bug3('submitGroups', new Error('boom'), '交牌后的收尾出了错，牌可能已经交上去了；错误已经记下了，先回房间看一眼，别急着重交');
+    eq(flashes[0], '交牌后的收尾出了错，牌可能已经交上去了；错误已经记下了，先回房间看一眼，别急着重交', '自定义文案生效');
 
     /* ④ userMsg === null = 只上报不提示（回座那种「本来就该安静」的场景） */
     flashes = [];

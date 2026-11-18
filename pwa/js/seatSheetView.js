@@ -289,7 +289,7 @@
     if (!box || !pid) return;
     var p = ssPlayer(pid);
     if (p && p.isBot) {
-      box.innerHTML = '<p class="ss-note">AI 玩家没有战绩记录。补齐人头用的，走了也不留痕。</p>';
+      box.innerHTML = '<p class="ss-note">AI 没有战绩。补齐人头用的，走了也不留痕。</p>';
       placeSeatSheet();
       return;
     }
@@ -320,7 +320,7 @@
       placeSeatSheet();
     }).catch(function () {
       if (ssPid !== pid) return;
-      box.innerHTML = '<p class="ss-note">网络异常，稍后再试。</p>';
+      box.innerHTML = '<p class="ss-note">这位玩家的战绩没读上来，关掉面板重新打开</p>';
       placeSeatSheet();
     });
   }
@@ -373,7 +373,7 @@
     var sub = $('#ss-sub');
     if (sub) {
       sub.textContent = !ssPid ? '所有人都看得到'
-        : (p && p.isBot ? 'AI 玩家' : (p ? (p.score | 0) + ' 分' : ''));
+        : (p && p.isBot ? 'AI' : (p ? (p.score | 0) + ' 分' : ''));
     }
 
     /* 能不能发：自己不能发给自己；开关关了也不给这两档（连入口都不留，
@@ -467,7 +467,7 @@
     emojiLastSend = now;
     var to = emojiTarget || Emoji.BROADCAST;
     var sent = RoomStore.sendEmoji(state.roomId, state.myId, to, id);
-    if (!sent) { flash('没发出去，检查一下网络'); return; }
+    if (!sent) { flash('表情没发出去，别人没看到；回到牌桌再点一次'); return; }
     closeSeatSheet();
   }
 
