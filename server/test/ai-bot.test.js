@@ -7,6 +7,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 process.env.PROFILE_FILE = require('path').join(require('os').tmpdir(), 'lxw-test-profiles-' + Date.now() + '.json');
 // 种子也指到临时目录：否则会读到仓库里的真实榜单，断言的数量一变就挂
 process.env.SEED_FILE = require('path').join(require('os').tmpdir(), 'lxw-test-seed');
@@ -19,10 +21,15 @@ const { registerPlayer, httpJson, httpAuth } = require('./helpers/account');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + b + ', got ' + a); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + b + ', got ' + a);
+}
 
 class Client {
   constructor(playerId, nickname, token) {

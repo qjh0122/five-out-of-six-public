@@ -24,6 +24,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* 这个文件里 GRACE 要足够长，让「补挂」与「立刻判离开」两种分支都能被测到；
  * 房间回收给个大值，免得它在断言中途把房间删了。 */
 process.env.GRACE_MS = '60000';
@@ -41,10 +43,15 @@ const FILE = path.join(DIR, 'state.json');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 function mkRoom(roomId) {
   const room = SM.newRoom(roomId, { id: 'pa', nickname: '甲' }, { handLimit: 3 });

@@ -11,6 +11,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -24,8 +26,9 @@ const SW = read('sw.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  ✓ ' + name); }
-  else { fail++; console.log('  ✗ ' + name + (extra !== undefined ? '  ← ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function head(t) { console.log('\n' + t); }
 

@@ -17,15 +17,22 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const SM = require('../js/stateMachine.js');
 
 let pass = 0;
 let fail = 0;
 function ok(cond, label, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + label); }
-  else { fail += 1; console.log('  FAIL  ' + label + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, label, extra);
 }
-function eq(a, b, label) { ok(a === b, label, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, label) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, label, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 function startRoom(roomId, ids) {
   const room = SM.newRoom(roomId, { id: ids[0], nickname: '玩家' + ids[0] });

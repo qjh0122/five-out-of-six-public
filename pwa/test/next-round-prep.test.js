@@ -16,15 +16,22 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const SM = require('../js/stateMachine.js');
 const CONFIG = require('../js/config.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /* 造一间「刚打完、停在结算态」的房：手牌与轮次都不重要，只关心报名与就位。 */
 function P(id, opts) {

@@ -18,6 +18,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 process.env.PROFILE_FILE = require('path').join(require('os').tmpdir(), 'lxw-spectate-profiles-' + Date.now() + '.json');
 process.env.SEED_FILE = require('path').join(require('os').tmpdir(), 'lxw-spectate-seed');
 process.env.PORT = process.env.PORT || '3203';
@@ -29,10 +31,15 @@ const { registerPlayer } = require('./helpers/account');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /* 把一手 6 张按本轮的组数填满（复制自 e2e.test.js：全靠规则，不猜牌面） */

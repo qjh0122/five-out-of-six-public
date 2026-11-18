@@ -17,13 +17,16 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'game.js'), 'utf8');

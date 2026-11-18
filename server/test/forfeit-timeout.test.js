@@ -8,6 +8,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 process.env.PROFILE_FILE = require('path').join(require('os').tmpdir(), 'lxw-ft-profiles-' + Date.now() + '.json');
 process.env.SEED_FILE = require('path').join(require('os').tmpdir(), 'lxw-ft-seed');
 process.env.SPLIT_TIMEOUT_MS = process.env.SPLIT_TIMEOUT_MS || '800';
@@ -21,10 +23,15 @@ const { registerPlayer } = require('./helpers/account');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 class Client {
   constructor(playerId, nickname, token) {

@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -36,8 +38,9 @@ const quiet = function () {};
 let pass = 0;
 let fail = 0;
 function ok(cond, label) {
-  if (cond) { pass += 1; console.log('  PASS  ' + label); }
-  else { fail += 1; console.log('  FAIL  ' + label); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, label);
 }
 
 const ACCOUNT = 'huizhang';

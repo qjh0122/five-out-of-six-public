@@ -14,6 +14,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -22,8 +24,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 const html = read('index.html');

@@ -14,6 +14,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 process.env.PROFILE_FILE = require('path').join(require('os').tmpdir(), 'lxw-wsl-profiles-' + Date.now() + '.json');
 process.env.SEED_FILE = require('path').join(require('os').tmpdir(), 'lxw-wsl-seed-' + Date.now());
 process.env.WS_AUTH_TIMEOUT_MS = '250';
@@ -25,10 +27,15 @@ const { server } = require('../index.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /** 造一个够用的假 socket：只实现 WSClient 会碰到的几个方法 */

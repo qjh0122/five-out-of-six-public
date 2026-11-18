@@ -14,6 +14,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 const O = require(path.join(__dirname, '..', '..', 'tools', 'qa', 'emoji-placement-oracle.js'));
@@ -23,8 +25,9 @@ const js = fs.readFileSync(path.join(ROOT, 'pwa', 'js', 'seatSheetView.js'), 'ut
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra !== undefined ? '  ← ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 console.log('\n[1] 尺子自验（正样本 + 该判红的样本 + 阈值敏感度）');

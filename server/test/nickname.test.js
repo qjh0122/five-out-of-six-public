@@ -14,6 +14,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 process.env.PROFILE_FILE = require('path').join(require('os').tmpdir(), 'lxw-nick-profiles-' + Date.now() + '.json');
 process.env.SEED_FILE = require('path').join(require('os').tmpdir(), 'lxw-nick-seed-' + Date.now() + '.json');
 process.env.PORT = process.env.PORT || '3209';
@@ -25,10 +27,15 @@ const { httpJson, httpAuth, registerPlayer } = require('./helpers/account');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /** 有没有孤立代理项（被切一半的 emoji 就是这个特征） */
 function hasLoneSurrogate(s) {

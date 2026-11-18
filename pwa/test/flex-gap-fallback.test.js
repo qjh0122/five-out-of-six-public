@@ -17,6 +17,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -28,8 +30,9 @@ const HTML = path.join(ROOT, 'pwa', 'index.html');
 let pass = 0;
 let fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 console.log('[1] 生成物存在且是最新的');

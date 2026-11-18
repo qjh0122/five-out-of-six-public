@@ -11,6 +11,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const path = require('path');
 const os = require('os');
 
@@ -22,10 +24,15 @@ const PORT = Number(process.env.PORT);
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + b + ', got ' + a); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + b + ', got ' + a);
+}
 
 /* ---------------------------- 浏览器环境垫片 ---------------------------- */
 /* roomStore.js 是给浏览器写的：靠 window.location 判断模式和 ws 地址，

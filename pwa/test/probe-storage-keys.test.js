@@ -22,6 +22,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -30,10 +32,15 @@ const SCRIPTS = path.join(ROOT, 'scripts');
 
 let pass = 0, fail = 0;
 function ok(c, m, extra) {
-  if (c) { pass++; console.log('  ✓ ' + m); }
-  else { fail++; console.log('  ✗ ' + m + (extra !== undefined ? '  ← ' + extra : '')); }
+  if (c) pass++;
+  else fail++;
+  ASSERT.log(ok, c, m, extra);
 }
-function eq(a, b, m, extra) { ok(a === b, m, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b) + (extra ? '  |  ' + extra : '')); }
+function eq(a, b, m, extra) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, m, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b) + (extra ? '  |  ' + extra : ''));
+}
 function head(t) { console.log('\n' + t); }
 
 /* ---- 从源头取两份清单，不复制字面量 ---- */

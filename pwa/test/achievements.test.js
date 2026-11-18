@@ -23,16 +23,21 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 var Ach = require('../js/achievements.js');
 var Engine = require('../js/engine.js');
 
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) pass += 1;
-  else { fail += 1; console.error('✗ ' + name + (extra ? ' — ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function eq(a, b, name) {
-  ok(a === b, name, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
 }
 
 /* 造一组结算结果。entries 是 [[id, typeName], …]，直接写死牌型 ——

@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { readAll: readGameAll } = require('./helpers/gameSource');
 const fs = require('fs');
 const path = require('path');
@@ -21,10 +23,15 @@ const Emoji = require('../js/emoji.js');
 const ROOT = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 console.log('\n[1] 清单本身');
 {

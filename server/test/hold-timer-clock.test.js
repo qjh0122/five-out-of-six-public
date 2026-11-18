@@ -22,6 +22,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* 三个时长在 hub 加载时读取 —— 必须在 require 之前设好。
  * 250ms 是「短到能真等」，又「长到不会因为一次 GC 抖动误判」。 */
 /* ★ v128：250ms → 1200ms。原来「120ms 时还没到期」只留了 130ms 余量，
@@ -41,10 +43,15 @@ const FILE = path.join(DIR, 'state.json');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function mkRoom(roomId) {

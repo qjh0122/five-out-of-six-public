@@ -24,6 +24,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -33,10 +35,15 @@ const JS = path.join(ROOT, 'js');
 let pass = 0;
 let fail = 0;
 function ok(c, m, extra) {
-  if (c) { pass++; console.log('  ✓ ' + m); }
-  else { fail++; console.log('  ✗ ' + m + (extra ? '  ← ' + extra : '')); }
+  if (c) pass++;
+  else fail++;
+  ASSERT.log(ok, c, m, extra);
 }
-function eq(a, b, m) { ok(a === b, m, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b)); }
+function eq(a, b, m) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, m, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
+}
 function head(t) { console.log('\n' + t); }
 
 function read(f) { return fs.readFileSync(path.join(JS, f), 'utf8'); }

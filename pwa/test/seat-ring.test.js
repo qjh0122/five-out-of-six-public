@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { readAll: readGameAll } = require('./helpers/gameSource');
 const fs = require('fs');
 const path = require('path');
@@ -24,8 +26,9 @@ const SEAT_BLOCK_W = 112; // 座位块（头像 68 / 昵称块 ≤120）在环�
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function near(a, b, tol) { return Math.abs(a - b) <= (tol == null ? 0.5 : tol); }
 

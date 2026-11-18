@@ -18,6 +18,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -26,8 +28,9 @@ const src = fs.readFileSync(SRC_PATH, 'utf8');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) pass += 1;
-  else { fail += 1; console.error('✗ ' + name + (extra ? ' — ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 /* ================================================================

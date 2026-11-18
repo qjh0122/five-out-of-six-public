@@ -18,16 +18,23 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const SM = require('../js/stateMachine.js');
 const CONFIG = require('../js/config.js');
 
 let pass = 0;
 let fail = 0;
 function ok(cond, label, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + label); }
-  else { fail += 1; console.log('  FAIL  ' + label + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, label, extra);
 }
-function eq(a, b, label) { ok(a === b, label, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, label) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, label, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /* 基准分一律读 CONFIG.INITIAL_SCORE（v106 起是 0）。这里原本有一份
  * `const INITIAL = 20`，基准改成 0 之后它就成了「测试自己编的基准」，

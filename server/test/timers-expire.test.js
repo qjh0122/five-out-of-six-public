@@ -18,6 +18,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* ★ v128：250ms → 1200ms。原来「120ms 时还没到点」只留 130ms 余量，
  * CI 上会被并发吃掉（BACKLOG C13）。放大窗口不改变判据。 */
 process.env.GRACE_MS = '1200';
@@ -33,10 +35,15 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'lxw-expire-'));
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function mkRoom(roomId) {

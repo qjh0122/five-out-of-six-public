@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* ---------------- 带容量上限的 mock localStorage ---------------- */
 var map = Object.create(null);
 var budget = Infinity;
@@ -47,10 +49,15 @@ var Records = require('../js/records.js');
 
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 var MIN = 60 * 1000;
 var T0 = new Date('2026-10-30T20:00:00+08:00').getTime();

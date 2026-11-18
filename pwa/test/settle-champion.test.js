@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { readAll: readGameAll } = require('./helpers/gameSource');
 const fs = require('fs');
 const path = require('path');
@@ -23,8 +25,9 @@ const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 /* 取整个函数声明（含 body），靠大括号配平 —— 比「找下一个 \n  }」稳：

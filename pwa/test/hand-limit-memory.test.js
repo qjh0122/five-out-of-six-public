@@ -13,14 +13,17 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const path = require('path');
 const fs = require('fs');
 const { readOne } = require('./helpers/gameSource.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 const src = readOne('game.js');

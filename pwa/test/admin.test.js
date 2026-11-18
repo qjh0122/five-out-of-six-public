@@ -7,6 +7,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -17,8 +19,9 @@ const server = fs.readFileSync(path.join(ROOT, '..', 'server', 'index.js'), 'utf
 let pass = 0;
 let fail = 0;
 function ok(cond, msg) {
-  if (cond) { pass++; console.log('  PASS  ' + msg); }
-  else { fail++; console.log('  FAIL  ' + msg); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, msg);
 }
 
 console.log('\n[页面存在且不被索引]');

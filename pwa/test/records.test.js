@@ -7,6 +7,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* ---------------- mock localStorage ---------------- */
 function makeLS() {
   var map = Object.create(null);
@@ -25,11 +27,14 @@ var Records = require('../js/records.js');
 /* ---------------- 断言工具 ---------------- */
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function eq(actual, expected, name) {
-  ok(actual === expected, name, 'expect ' + expected + ', got ' + actual);
+  if (actual === expected) pass++;
+  else fail++;
+  ASSERT.log(eq, actual === expected, name, 'expect ' + expected + ', got ' + actual);
 }
 function reset() { global.localStorage.clear(); }
 

@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const fs = require('fs');
 const path = require('path');
 const { stripComments, parseBlocks } = require('../../scripts/lib/css-blocks');
@@ -28,8 +30,9 @@ const js = stripComments(jsRaw);
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function rule(sel) {
   const b = parseBlocks(css).filter((x) => x.selector.replace(/\s+/g, ' ') === sel);

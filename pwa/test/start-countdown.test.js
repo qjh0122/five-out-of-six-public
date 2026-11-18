@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { readAll: readGameAll } = require('./helpers/gameSource');
 const fs = require('fs');
 const path = require('path');
@@ -29,8 +31,9 @@ const cfgJs = fs.readFileSync(path.join(ROOT, 'js', 'config.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 /* 取一个具名函数的函数体（从 `function name(` 到下一个缩进两格的收尾大括号）。
  * game.js 全是 ES5 函数声明 + 两格缩进，这个足够稳。 */

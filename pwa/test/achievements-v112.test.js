@@ -10,14 +10,21 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const Ach = require('../js/achievements.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass += 1; console.log('  PASS  ' + name); }
-  else { fail += 1; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /* 造一轮结算结果：groups 里每组的 entries 只有 id 与 typeName，
  * 和 Engine.settleGroup 的真实输出形状一致（其余字段这里用不到）。 */

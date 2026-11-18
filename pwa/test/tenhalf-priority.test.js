@@ -15,15 +15,22 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const SM = require('../js/stateMachine.js');
 const Engine = require('../js/engine.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /* 牌：A=14、J/Q/K=11/12/13，王 rank=15；十点半里 JQK 算半点、A 算 1 点 */
 function C(suit, rank) { return { suit: suit, rank: rank }; }

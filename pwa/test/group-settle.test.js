@@ -21,16 +21,21 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 var SM = require('../js/stateMachine.js');
 var CONFIG = require('../js/config.js');
 
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function eq(a, b, name) {
-  ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
 }
 function head(t) { console.log('\n' + t); }
 

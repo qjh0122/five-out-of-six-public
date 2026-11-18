@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const path = require('path');
 const { BotClient } = require('../botClient.js');
 const Engine = require(path.join(__dirname, '..', '..', 'pwa', 'js', 'engine.js'));
@@ -23,8 +25,9 @@ const Card = require(path.join(__dirname, '..', '..', 'pwa', 'js', 'card.js'));
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + JSON.stringify(extra) : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 /* 只为了拿到 split()/strategy，不连任何服务：base 给个假地址，

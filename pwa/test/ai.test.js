@@ -7,14 +7,17 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const Card = require('../js/card.js');
 const SM = require('../js/stateMachine.js');
 const AI = require('../js/ai.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 
 const ROUNDS = 2000;

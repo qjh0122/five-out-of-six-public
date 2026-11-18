@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 /* settleView 是浏览器全局模块（IIFE 挂 window.LXW）。
  * create() 只在用到渲染函数时才碰 DOM，holdLeftText 完全不需要 ——
  * 但 create 顶层解构了 LXW.utils 的一堆函数，所以要给个最小桩。 */
@@ -39,10 +41,15 @@ var SV = global.LXW.settleView({ state: { myId: 'pa' } });
 
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 ok(typeof SV.holdLeftText === 'function', '导出了 holdLeftText');
 

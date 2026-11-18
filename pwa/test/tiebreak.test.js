@@ -16,13 +16,16 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const E = require('../js/engine.js');
 const Card = require('../js/card.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function C(suit, rank) { return { suit: suit, rank: rank }; }
 const JOKER = C('joker', 15);

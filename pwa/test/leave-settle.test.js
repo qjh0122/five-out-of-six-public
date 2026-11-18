@@ -16,13 +16,16 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const SM = require('../js/stateMachine.js');
 
 let pass = 0;
 let fail = 0;
 function ok(cond, label) {
-  if (cond) { pass += 1; console.log('  PASS  ' + label); }
-  else { fail += 1; console.log('  FAIL  ' + label); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, label);
 }
 
 /* 初始分从配置读，不再写死 20：v105 把基准改成了 0，

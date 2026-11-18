@@ -19,14 +19,17 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { readAll: readGameAll } = require('./helpers/gameSource');
 const fs = require('fs');
 const path = require('path');
 
 let pass = 0, fail = 0;
 function ok(cond, name, detail) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (detail ? '  -> ' + detail : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, detail);
 }
 
 const ROOT = path.join(__dirname, '..');

@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const Card = require('../js/card.js');
 const E = require('../js/engine.js');
 const SM = require('../js/stateMachine.js');
@@ -20,8 +22,9 @@ const CONFIG = require('../js/config.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function C(suit, rank) { return { suit: suit, rank: rank }; }
 const JOKER = C('joker', 15);

@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const http = require('http');
 const zlib = require('zlib');
 const fs = require('fs');
@@ -28,10 +30,15 @@ const PWA = path.join(__dirname, '..', '..', 'pwa');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /** 拿到原始字节与响应头，不自动解压 */
 function get(pathName, headers, method) {

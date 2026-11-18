@@ -15,6 +15,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -33,10 +35,15 @@ const { server, profiles } = require('../index.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
-function eq(a, b, name) { ok(a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); }
+function eq(a, b, name) {
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'expect ' + JSON.stringify(b) + ', got ' + JSON.stringify(a));
+}
 
 /** 通用请求：body 是 Buffer 时按二进制发（头像上传走这条） */
 function request(method, p, headers, body) {

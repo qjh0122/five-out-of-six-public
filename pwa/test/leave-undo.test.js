@@ -12,6 +12,8 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 var fs = require('fs');
 var path = require('path');
 var ROOT = path.join(__dirname, '..');
@@ -54,11 +56,14 @@ var SPEC = {
 
 var pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  ✓ ' + name); }
-  else { fail++; console.log('  ✗ ' + name + (extra !== undefined ? '  ← ' + extra : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 function eq(a, b, name) {
-  ok(a === b, name, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
+  if (a === b) pass++;
+  else fail++;
+  ASSERT.log(eq, a === b, name, 'got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
 }
 function head(t) { console.log('\n' + t); }
 

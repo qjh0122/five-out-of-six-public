@@ -14,12 +14,15 @@
  */
 'use strict';
 
+const ASSERT = require('../../scripts/test-harness');
+
 const { handDeltas } = require('../botRunner.js');
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
-  if (cond) { pass++; console.log('  PASS  ' + name); }
-  else { fail++; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + JSON.stringify(extra) : '')); }
+  if (cond) pass++;
+  else fail++;
+  ASSERT.log(ok, cond, name, extra);
 }
 const byName = (arr) => {
   const o = {};
