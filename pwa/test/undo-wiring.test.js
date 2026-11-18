@@ -121,25 +121,27 @@ head('[5] CSS：容器点不穿、按钮点得到');
   ok(!!act && /min-height:\s*8[0-9]px/.test(act[1]), '★ 按钮够高（88 设计px ≈ 46 CSS px）');
 }
 
-head('[6] 离开房间接成撤销条第二个调用方（AC-NB-09 接线守卫）');
+head('[6] 离开房间改为直接退：UndoBar 只剩战绩清除一个调用方');
 {
-  /* 与 leave-undo.test.js 的计数断言配对：那边证「0 次 / 1 次」，
-   * 这边证「leaveRoom 真的挂在 deferred 回调上」—— 只看 0 次会假绿（反例 1）。 */
-  const body = /askConfirm\(title, desc, function \(\) \{([\s\S]*?)\n    \}, \{ busyText/.exec(GAME);
-  ok(!!body, '找到 onLeave 的确认回调');
+  /* 本轮用户要求去掉确认 + 撤销条：这边只证「onLeave 直接发 leaveRoom」，
+   * 战绩清除那条调用链的断言在 [4]，仍必须全绿。 */
+  const body = /function onLeave\(\) \{([\s\S]*?)\n  \}/.exec(GAME);
+  ok(!!body, '找到 onLeave 函数体');
   const b = body ? body[1] : '';
-  ok(!/RoomStore\.leaveRoom\(/.test(b), '★★ 确认回调同步路径上没有 leaveRoom（延迟执行）');
-  ok(/UndoBar\.show\(/.test(b), '★ 确认后调的是 undoBar.show()');
-  ok(/onCommit:\s*function \(\) \{ return doLeave\(\); \}/.test(GAME), '★★ 真离开挂在 onCommit');
-  /* M1：把 doLeave 里的 leaveRoom 删掉，上面三条仍会绿 —— 必须再钉一次调用点本身。 */
-  const dl = /function doLeave\(\) \{([\s\S]*?)\n    \}/.exec(GAME);
-  ok(!!dl && /RoomStore\.leaveRoom\(/.test(dl[1]), '★★ doLeave 里真有 RoomStore.leaveRoom 调用点（删掉即红）');
-  ok(/function leaveMustCommitNow\(confirmSnap, r\)/.test(GAME), '★ 单一守卫已落 attachRoom 订阅回调');
-  ok(/UndoBar\.flush\('room-changed'\)/.test(GAME), '★ 命中 P1–P4 立即提交');
-  ok(/UndoBar\.isPending\(\)/.test(GAME), '★ 入口连点短路');
+  ok(!/askConfirm\(/.test(b), '★★ onLeave 不再走确认框');
+  ok(!/UndoBar\.show\(/.test(b), '★★ onLeave 不再调 undoBar.show()（撤销条只剩战绩清除）');
+  ok(/RoomStore\.leaveRoom\(/.test(b), '★★ 离开直接调 leaveRoom（同步路径，非延迟）');
+  ok(/cleanupRoom\(\)/.test(b) && /showScreen\('screen-home'\)/.test(b), '三步都在 onLeave 内');
+  /* M1：把 leaveRoom 调用点删掉就红 —— 不能只看「有 onLeave 函数」。 */
+  ok(b.split('RoomStore.leaveRoom(').length - 1 === 1, '★★ leaveRoom 调用点恰好 1 次（删掉即红）');
+  ok(/leaveInFlight/.test(b) && /if \(!restore\) return;/.test(b), '★ 连点双保险：在途标记 + pressBusy');
+  ok(!/function leaveMustCommitNow|function doLeave\(|fetchRoomSnapshot/.test(GAME),
+    '★ 离开撤销专属函数已从 game.js 移除');
+  ok(!/UndoBar\.flush\('room-changed'\)/.test(GAME), '★ 不再有 room-changed 结账');
+  ok(/UndoBar\.flush\('navigate'\)/.test(GAME), '★ 共享的 navigate 结账仍在（战绩清除）');
   ok((HTML.match(/id="undo-bar"/g) || []).length === 1, '★ 仍只有一个 #undo-bar（不新建第二个条子）');
   const UNDO = read('js/undoBar.js');
-  ok(/'room-changed'/.test(UNDO), '★ room-changed 已登记进 reason 注释（实现不改）');
+  ok(/function flush\(/.test(UNDO), '★ UndoBar.flush 本体仍在（实现不改）');
 }
 
 console.log('\n========================================');

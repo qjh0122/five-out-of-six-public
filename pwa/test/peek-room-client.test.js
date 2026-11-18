@@ -8,11 +8,15 @@
  * 踩过的坑（真机探针才发现的）：服务端的回包是 `{ room }`，**没有 `ok` 字段**——
  * 其它接口（createRoom / joinRoom）也是这样，都由客户端各自补 `{ ok: true }`。
  * peekRoom 第一版漏了这一步，于是 `res.ok === undefined`，
- * `onLeave` 里的 `(res && res.ok && res.room)` 恒为假，快照永远拿不到。
+ * 消费方里的 `(res && res.ok && res.room)` 恒为假，快照永远拿不到。
  *
  * 表现是：明明连着网、服务端也回了，确认框却总多出一行
  * 「（没连上服务端核对最新进度，以上按本地画面判断。）」。
  * 这种「功能和降级路径长得一样」的 bug 最麻烦，只能靠断言回包形状挡住。
+ *
+ * ★ 本轮改动：离开房间已改为直接退，game.js 不再调 peekRoom —— 这个只读 API
+ *   本身保留（roomStore.js 未动），本文件继续守它的回包契约，但断言标签
+ *   不再假称「onLeave 正在用」。
  */
 'use strict';
 
@@ -56,7 +60,7 @@ function eq(a, b, name) {
 
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-/* 一条最小可用的房间快照：onLeave 只用 phase / round / players[].score */
+/* 一条最小可用的房间快照：历史消费方只用 phase / round / players[].score */
 const ROOM = {
   roomId: '123456',
   phase: 'ROUND1_SPLIT',
@@ -95,10 +99,10 @@ async function run() {
   ok(!!res.room, 'room 带回来了');
   eq(res.room.phase, 'ROUND1_SPLIT', 'phase 原样透传');
   eq(res.room.round, 1, 'round 原样透传');
-  eq(res.room.players[0].score, 17, '自己的分数可读（确认框要展示）');
+  eq(res.room.players[0].score, 17, '自己的分数可读（快照契约）');
 
-  /* onLeave 的判据就是这个三元表达式，顺带锁一遍语义 */
-  ok(!!(res && res.ok && res.room), '★ onLeave 的判据 (res.ok && res.room) 成立');
+  /* 快照消费方的判据就是这个三元表达式，顺带锁一遍语义 */
+  ok(!!(res && res.ok && res.room), '★ 成功判据 (res.ok && res.room) 成立');
   ok(!(!!(res && res.ok && res.room) === false), '★ 不会被误判成「拿不到快照」');
 
   /* ---------------------------------------------------------------- */
@@ -109,8 +113,8 @@ async function run() {
   ws.deliver({ type: 'ok', reqId: s2.reqId, payload: {} });
   const res2 = await p2;
   eq(res2.ok, true, '仍然算「请求成功」');
-  eq(res2.room, null, '但 room 是 null（onLeave 会据此判断拿不到快照）');
-  ok(!!(res2.ok && res2.room) === false, '判据此时为假 → 会走「没核对上」的降级文案');
+  eq(res2.room, null, '但 room 是 null（消费方会据此判断拿不到快照）');
+  ok(!!(res2.ok && res2.room) === false, '判据此时为假（历史降级路径的依据）');
 
   /* ---------------------------------------------------------------- */
   console.log('\n[服务端报错]');

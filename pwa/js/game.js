@@ -303,11 +303,7 @@
   }
 
   /* ---------------------------- 屏幕切换 ---------------------------- */
-  var lastScreenId = '';   // 当前可见屏的 id（showScreen 唯一写入点）
   function showScreen(id) {
-    /* 「现在露的是哪一屏」的唯一记录点：撤销条的屏级锚点（setLeaveOrigin）需要它。
-     * 只记 id，不另存状态 —— 与下面 screens 循环同源，不会出现两处说法不一致。 */
-    lastScreenId = id;
     /* 离开战绩页时，把「待撤销的清除」结账（v136）。
      * 用户已经换到别的屏，说明他接受了这次清除 —— 不结账的话条子会在
      * 别的页面上继续倒数，5 秒后**在背后**把数据删掉，没有任何人看得见。 */
@@ -3365,26 +3361,6 @@
     state.roomId = roomId;
     state.room = room;
     state.unsub = RoomStore.subscribe(roomId, function (r, meta) {
-      lastRoomMeta = meta || null;
-      /* 唯一的状态变更守卫：命中 P1–P4 立即提交，不作废、不照常执行、不等满 5 秒。 */
-      if (leaveMustCommitNow(leaveConfirmSnap, r)) {
-        markLeaveIrrevocable();
-        if (UndoBar) UndoBar.flush('room-changed');
-        leaveConfirmSnap = null;
-        /* flush 的 render() 会把 #undo-msg 清空：把「已不可撤销」回写到条子上再收起，
-         * 机检读得到文案，玩家侧由 flash 看见同一句。 */
-        var im = $('#undo-msg'), ia = $('#undo-act');
-        if (im) im.textContent = LEAVE_IRREVOCABLE;
-        if (ia && ia.removeAttribute) ia.removeAttribute('disabled');
-        flash(LEAVE_IRREVOCABLE);
-        /* 已结算的广播仍要进本机战绩；但不再 cleanupRoom()/showScreen()/render() ——
-         * onCommit 已做过一次，重复走就是第二次导航 + 第二条「已退出房间」。 */
-        if (r) {
-          state.room = r;
-          try { absorbRoom(r); } catch (e) { /* 记账失败不该挡住离开 */ }
-        }
-        return;
-      }
       if (r === null) {
         cleanupRoom();
         showScreen('screen-home');
@@ -3712,50 +3688,6 @@
     }
   }
 
-  /* 离开前向服务端要一次最新房间快照。
-   *
-   * 为什么要多这一趟：本地 state.room 是 WS 推过来的，可能落后。
-   * 手机上切后台再切回来、或者网络抖一下，很容易出现「本地还显示等待中、
-   * 服务端其实已经在分牌」的错位。这时界面会给一个毫无预警的
-   * 「离开房间」，玩家点确定，一局就默默算成了弃局——分数照扣。
-   * 判定「算不算弃局」这件事只能以服务端为准。
-   *
-   * 走 peekRoom 而不是 reconnect：后者会补分牌时限，反复点「离开 / 取消」
-   * 就能一直续命。读状态不能带副作用。
-   *
-   * 拿不到快照（离线 / 超时 / 座位已失效）不算失败：退回本地快照，
-   * 但文案里要说清「没核对上」，别让玩家以为系统已经确认过。 */
-  function fetchRoomSnapshot() {
-    return new Promise(function (resolve) {
-      var done = false;
-      var timer = setTimeout(function () {
-        if (done) return;
-        done = true;
-        resolve(null);
-      }, 2500);
-      var p;
-      /* 同步抛 = 本端 bug（ws.peekRoom 已经把拒绝转成 {ok:false} 了）。
-       * 用户侧由下面的 resolve(null) 兜底并说「没核对上」，所以这里只上报不提示。 */
-      try { p = RoomStore.peekRoom(state.roomId); } catch (e) { reportBug('peekRoom', e, null); p = null; }
-      if (!p || typeof p.then !== 'function') {
-        clearTimeout(timer);
-        resolve(null);
-        return;
-      }
-      p.then(function (res) {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        resolve((res && res.ok && res.room) || null);
-      }, function () {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        resolve(null);
-      });
-    });
-  }
-
   /* 取第一个「真正看得见」的按钮。
    * 判据是祖先链上有没有 .hidden —— 只判元素自己的 class 不够：
    * .screen 隐藏时子按钮自己身上没有 hidden，但它并没有显示出来。 */
@@ -3767,183 +3699,39 @@
     return null;
   }
 
-  /* ---------------- 离开房间：5 秒内可以反悔（design-next-batch-v1.md §2.3 / §2.5） ----------------
-   * 三步（leaveRoom / cleanupRoom / showScreen）整体搬进 undoBar 的 onCommit：
-   * 服务端没有逆操作，窗口内**真的没离开**，撤销才不是「本机假装回去」。
-   * 四句文案的终值逐字取自 §2.5，不在别处复述。 */
-  var LEAVE_MSG_MID = '正在离开（5 秒内可撤销）· 对局中离开算弃局，其他人这局也会结束';
-  var LEAVE_MSG_IDLE = '正在离开房间（5 秒内可撤销）';
-  var LEAVE_UNDO_MSG = '已取消，你还在房间里';
-  var LEAVE_IRREVOCABLE = '房间状态已变化，已按最新状态离开，本次无法撤销';
+  /* ---------------- 离开房间：直接退（用户要求，本轮改动） ----------------
+   * 点「离开房间」→ leaveRoom → cleanupRoom → showScreen('screen-home')。
+   * 不再有确认框、5 秒撤销条，也不再为确认文案走一趟网络快照。
+   * 退房是尽力而为：断网 / 房间已删也照常回首页，绝不把人卡在房间里。
+   * 对局中离开仍按弃局记入战绩 —— 那是服务端 leaveRoom 的行为，本端不动。 */
+  var leaveInFlight = false;   // 在途标记：连点只发一次 leaveRoom（不引入第二个计时器 / 状态机）
 
-  var leaveConfirmSnap = null;   // 有待撤销的离开时，确认前的房间快照；提交 / 撤销即清空
-  var lastRoomMeta = null;       // 最近一次广播的 meta，供 P4 判「本局结算事件」
-
-  /* 结算页的撤销条锚点必须**算**，不能写死一个数。
-   * 390×844 实测：底部动作区 630–782、等待行 582–613（策略行两行时）、
-   * 结算数字 273–356 —— 竖向没有一处 62px 的空档，而「等待行」的高度会随
-   * 文案和宽度变（策略行 390 两行 / 320 两行 / HOLD 态一行）。
-   * 写死的 bottom 一定会在某一档正好压住它（第一版写 481：390 压等待行 2332px²，
-   * 320 压「改把数」那一排）。这里按**当时的真实矩形**算：把条子底边放到
-   * 「等待行顶 / 动作区顶」中更靠上的那个，再往上留 8 CSS px。
-   * 单位换算：#stage 有 transform 缩放，条子的 bottom 是设计 px，
-   * 所以要除以 scale = 渲染高 / 布局高。 */
-  function anchorLeaveBarOnSettle(bar) {
-    var stage = document.getElementById('stage');
-    var wait = document.getElementById('settle-wait');
-    var actions = document.querySelector('#screen-settle .room-actions');
-    if (!bar || !stage || !wait || !actions) return;
-    var sr = stage.getBoundingClientRect();
-    var scale = stage.offsetHeight ? (sr.height / stage.offsetHeight) : 0;
-    if (!scale) return;
-    var top = Math.min(wait.getBoundingClientRect().top, actions.getBoundingClientRect().top);
-    var bottomCss = sr.bottom - top + 8;
-    bar.style.bottom = Math.max(0, Math.round(bottomCss / scale)) + 'px';
-  }
-
-  function setLeaveOrigin(on) {
-    var bar = $('#undo-bar');
-    if (!bar || !bar.setAttribute) return;   // 旧缓存没条子：靠 no-dom 兜底真离开
-    if (on) {
-      bar.setAttribute('data-undo-origin', 'leave');
-      bar.style.bottom = '';
-      /* 三屏里只有结算屏需要算：房间 / 对局屏用 CSS 的 300 已经实测不压主控件，
-       * 结算屏没有空档，只能按当前高度落。 */
-      if (lastScreenId === 'screen-settle') anchorLeaveBarOnSettle(bar);
-    } else {
-      bar.removeAttribute('data-undo-origin');
-      bar.style.bottom = '';
-    }
-  }
-
-  /* 单一判据：P1 房间没了 / P2 阶段推进 / P3 已解散或我不在席位 / P4 本局结算事件。
-   * 明确**不**判：ownerId 变化、其他成员进出、score / ready / wantNext / holdNext、
-   * 未生效的 dissolve 投票过程。
-   * 只有确实存在「待撤销的离开」（leaveConfirmSnap 非空）才可能返回真 ——
-   * 否则清除战绩那条撤销会被房间广播误结账。 */
-  function leaveMustCommitNow(confirmSnap, r) {
-    if (!confirmSnap) return false;
-    if (r === null) return true;                                             // P1
-    if (!r || typeof r !== 'object') return false;
-    if (confirmSnap.phase && r.phase && r.phase !== confirmSnap.phase) return true;   // P2
-    if (r.dissolved === true || r.isDissolved === true || r.phase === 'DISSOLVED') return true; // P3
-    var d = r.dissolve;
-    if (d && typeof d === 'object' && (d.passed === true || d.applied === true)) return true; // P3（已生效）
-    if (r.players && r.players.length) {                                     // P3：players 里已无我
-      var stillIn = false;
-      for (var i = 0; i < r.players.length; i++) {
-        var p = r.players[i];
-        if (p && String(p.id) === String(state.myId) && !p.left) { stillIn = true; break; }
-      }
-      if (!stillIn) return true;
-    }
-    var m = lastRoomMeta;                                                     // P4：结算广播
-    if (m) {
-      var t = String(m.type || m.event || m.reason || '').toLowerCase();
-      if (/settle|roundend|round_end|gameover|endround|result/.test(t)) return true;
-      if (m.settled === true || m.roundEnded === true || m.gameEnded === true) return true;
-    }
-    if (r.settled === true && confirmSnap.settled !== true) return true;
-    return false;
-  }
-
-  /* 命中后：条子切「已不可撤销」文本、撤销入口失效，随后由 flush 收起。
-   * 不新建节点、不新建弹窗；可见性由既有 flash 兜住（§2.5 的两个载体之一）。 */
-  function markLeaveIrrevocable() {
-    var msg = $('#undo-msg'), act = $('#undo-act');
-    if (msg) msg.textContent = LEAVE_IRREVOCABLE;
-    if (act && act.setAttribute) act.setAttribute('disabled', 'disabled');
-  }
-
-  async function onLeave() {
-    if (!state.roomId) return;
-    /* 连点短路：第二次「离开」不能把第一次顶成 superseded —— 那会真把人踢出房间，
-     * 再开一个已经没有对象的窗口。别的待撤销动作进来时仍由契约规矩 1 结账，不例外。 */
-    if (UndoBar && UndoBar.isPending()) { flash('正在离开…'); return; }
-    if (blockedOffline()) return;
-    /* 核对进度要走一趟网络，最长 2.5 秒。这期间按钮必须有反馈——
-     * 「点了没反应」和「点了没生效」在手机上分不出来，人只会反复点。
-     * 三个入口（房间页 / 对局页 / 结算页）共用一个 onLeave，按**当前可见的那个**给忙碌态。
-     * 以前这里是按 phase 猜的：`phase !== WAITING` 就取 #btn-leave-game。
-     * 但结算页和就位态都是 SETTLED，人在结算页时猜出来的却是对局页那颗 ——
-     * 忙碌态加到一个 display:none 的按钮上，玩家点的那个一点反应都没有，
-     * 于是再点一次，被连点短路静默吞掉。请求没重发，人已经困惑了。 */
+  function onLeave() {
+    if (!state.roomId || leaveInFlight) return;
+    /* 四个入口（房间 / 对局 / 结算 / 旁听卡）共用一个 onLeave，忙碌态给玩家真正点的那个；
+     * pressBusy 自带「已在忙返回 null」，这里再挡一层连点。 */
     var btn = firstShown(['btn-leave-spectator', 'btn-leave', 'btn-leave-game', 'btn-back-room']);
-    var restore = pressBusy(btn, '核对中…');
-    if (!restore) return;                     // 连点：上一个还在核对，忽略这一次
-    var snap = null;
-    try {
-      snap = await fetchRoomSnapshot();
-    } finally {
-      restore();
-    }
-    if (!state.roomId) return;                // 核对期间房间已结束/已退出
-    /* 对局中和等待中的后果完全不同，文案必须分开写。
-     * 「离开房间」在对局中等价于弃局：本场按当前分数记入战绩（不是免费走人），
-     * 而且剩下的人会被判定「人数不足，本局结束」——这个代价得先讲清楚。 */
-    var room = snap || state.room || null;
-    var fresh = !!snap;
-    var ph = room && room.phase;
-    var mid = !!ph && ph !== StateMachine.PHASE.WAITING && ph !== StateMachine.PHASE.SETTLED;
-    var title = mid ? '弃局离开？' : '离开房间';
-    var desc;
-    if (mid) {
-      /* 把「第几轮、多少分」写出来：只说「按当前分数」太抽象，
-       * 玩家没法判断这一走要赔掉多少，也就更容易误点。 */
-      var roundNo = Number(room.round) > 0 ? Number(room.round) : 1;
-      var me = null;
-      var ps = room.players || [];
-      for (var i = 0; i < ps.length; i++) {
-        if (ps[i] && String(ps[i].id) === String(state.myId)) { me = ps[i]; break; }
-      }
-      var scoreTxt = me && typeof me.score === 'number' ? ('现在 ' + me.score + ' 分') : '当前分数';
-      desc = '第 ' + roundNo + ' 轮正在进行。现在离开算弃局：本场按你' + scoreTxt +
-        '记入战绩，其他人这局也会就此结束。';
-    } else {
-      desc = '确定要离开当前房间吗？';
-    }
-    /* 本地演示模式（?mode=local）本来就没有服务端可核对，不该报这句话 */
-    if (!fresh && RoomStore.getMode && RoomStore.getMode() === 'ws') {
-      desc += '\n（没连上服务端核对最新进度，以上按本地画面判断。）';
-    }
-    /* 确认后**不导航、不调 leaveRoom**：三项动作整体延到 onCommit（延迟执行）。
-     * roomId / myId 在确认时捕获 —— 窗口内 r===null 分支可能已经 cleanupRoom() 清空了 state。 */
+    var restore = pressBusy(btn, '离开中…');
+    if (!restore) return;
+    leaveInFlight = true;
+    /* 房间号 / 座位在发请求前捕获：finish() 里 cleanupRoom() 会清空 state。 */
     var leaveRoomId = state.roomId, leaveMyId = state.myId;
-    var confirmSnap = snap || state.room || null;
-    function doLeave() {
-      setLeaveOrigin(false);
-      leaveConfirmSnap = null;
-      try {
-        return Promise.resolve(RoomStore.leaveRoom(leaveRoomId || state.roomId, leaveMyId || state.myId))
-          .catch(function () { /* 断网 / 房间已删除：沿用 roomStore 的尽力而为，不弹离开失败 */ })
-          .then(function () {
-            cleanupRoom();
-            showScreen('screen-home');
-          });
-      } catch (e) {
-        /* 同步抛也不能把人卡在房间里；三步可重复调用不抛错（§2.3 提交幂等）。
-         * 只上报、不弹窗：断网也算退出，不把玩家卡回房间。 */
-        reportBug('onLeave', e);
-        cleanupRoom();
-        showScreen('screen-home');
-        return Promise.resolve();
-      }
+    function finish() {
+      leaveInFlight = false;
+      restore();
+      cleanupRoom();
+      showScreen('screen-home');
     }
-    askConfirm(title, desc, function () {
-      setLeaveOrigin(true);
-      leaveConfirmSnap = confirmSnap;
-      if (!UndoBar) { doLeave(); return; }        // 旧缓存连条子都没有：动作照做
-      UndoBar.show({
-        msg: mid ? LEAVE_MSG_MID : LEAVE_MSG_IDLE,
-        action: '撤销',
-        onUndo: function () {
-          setLeaveOrigin(false);
-          leaveConfirmSnap = null;
-          flash(LEAVE_UNDO_MSG);
-        },
-        onCommit: function () { return doLeave(); }
-      });
-    }, { busyText: '离开中…' });
+    try {
+      Promise.resolve(RoomStore.leaveRoom(leaveRoomId, leaveMyId))
+        /* 断网 / 房间已删：沿用 roomStore 的尽力而为，不弹「离开失败」。 */
+        .catch(function () {})
+        .then(finish);
+    } catch (e) {
+      /* 同步抛也不能把人卡在房间里：只上报、不弹窗，三步照做。 */
+      reportBug('onLeave', e);
+      finish();
+    }
   }
 
   async function onProposeDissolve() {
@@ -5445,14 +5233,6 @@
     window.addEventListener('resize', resize);
     window.addEventListener('resize', updateOppScrollHint);
     window.addEventListener('orientationchange', function () { setTimeout(resize, 200); });
-    /* 结算屏撤销条的锚点是按当时矩形算的（anchorLeaveBarOnSettle）：
-     * 窗口在 5 秒窗口内变了尺寸 / 转了屏，就得按新矩形重算，
-     * 否则条子会停在旧位置 —— 那正是 N-1 要防的「压住主控件」。 */
-    window.addEventListener('resize', function () {
-      if (UndoBar && UndoBar.isPending() && lastScreenId === 'screen-settle') {
-        anchorLeaveBarOnSettle($('#undo-bar'));
-      }
-    });
 
     /* 输入框失焦后再量一次。
      *

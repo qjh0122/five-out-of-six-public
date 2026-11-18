@@ -413,10 +413,17 @@ B-2 只在「结算后 + 我还没准备」时确认，B-3 提示带房号，B-4
 | 数字阶梯 | v138 | 六个字号 → 四档封闭阶梯 `{88,48,32,24}` + 单位 `{28,20}`；删掉「小屏反而更小」的双重缩小；横屏冠军不再比竖屏小 | `number-scale.test.js` 30 + `probe-numbers.js`（六档） |
 | 后悔权收口 / 引导 / 320 债 | **本批（待发布）** | 离开三步搬进 `onCommit` + P1–P4 状态变更守卫；「等人」判 A 销项（已可见，不重复造）；首次进结算页一行策略引导；320×568 几何断言 + 独立分片进 CI。**规格/裁定/验收见 `design-next-batch-v1.md` / `qa-next-batch-v1.md` / `build-next-batch-v1.md`** | `leave-undo.test.js` + `undo-wiring.test.js` + `number-scale.test.js` + `ci-matrix.test.js` + `probe-undo.js` + `probe-numbers.js` + `probe-ui-flow.js` 320 分片 |
 
+> **⚠️ 2026-11-18 撤需求**：原 B3 第 1 项「离开房间的撤销」已按用户要求**整体移除**
+> （confirm 弹窗 + 5 秒撤销条 + 网络核对全去掉，点一下直接退房回首页），见
+> [`leave-direct-change.md`](./leave-direct-change.md)。本节 ~:419 与批次表里
+> 「后悔权收口」行的离开撤销部分**作废、仅供历史查**；「等人可见 / 策略引导 / 320 债」
+> 三项不受影响。下方「B3 三项已处置」第 1 条已被本次撤需求取代。
+
 **B3 三项已处置（本批，本地全绿 · 待发布）**：
-1. **离开房间的撤销** —— 走「延迟执行」：`leaveRoom` / `cleanupRoom` / `showScreen` 三步整体搬进
+1. ~~**离开房间的撤销** —— 走「延迟执行」：`leaveRoom` / `cleanupRoom` / `showScreen` 三步整体搬进
    `undoBar.show().onCommit`；`attachRoom` 订阅回调的单一守卫 P1–P4 命中即 `flush('room-changed')`
-   立即提交，闭合「导航中被结账」。裁定见 `build-next-batch-v1.md` R1 / R2 / R9。
+   立即提交，闭合「导航中被结账」。裁定见 `build-next-batch-v1.md` R1 / R2 / R9。~~
+   **【2026-11-18 撤需求，已作废】** 见本节顶部说明。
 2. **「等人」对非房主可见** —— **判 A 销项**：两屏对非房主本就显示「房主在等人 + 还剩多久」，
    再加控件属重复设计；本批只做结算页 HOLD 文案口径对齐一行字（R3）。
 3. **首局后的策略引导** —— 改判为「首次进入结算页、按设备一次」，独立存储键；

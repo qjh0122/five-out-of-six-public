@@ -1,14 +1,16 @@
 /**
- * 离开房间撤销 + 首次进结算页策略引导
- * （qa-next-batch-v1.md 的 AC-NB-01～09 / AC-NB-14～18）
+ * 直接退 + 共享撤销条 + 首次进结算页策略引导
+ *
+ * 本轮改动：用户要求「取掉离开房间确认的步骤，离开就直接退就行了」——
+ *   onLeave 不再有 confirm 弹窗、5 秒撤销条，也不再为确认文案走 fetchRoomSnapshot。
+ * 撤销条本体**保留**：战绩清除（recordsView）还在用，组件状态机测试全部保留。
+ * 策略引导（AC-NB-14～18 / §4.2）一字未改。
  *
  * 取证口径（规格 §0.3）：
- *   · 所有期望值**写死在本文件**，来自 design-next-batch-v1.md §2.5 / §4.2 的终值表、
- *     undoBar.js 文件头契约（规矩 1/2/3）与手算（0 / 1 / 250 / 5000 / 10 / 28–36）。
- *   · 不 require 被测模块取期望值，不拿 DEFAULT_MS、pend、T1 之类内部常量当期望。
+ *   · 所有期望值**写死在本文件**，来自规格终值表 / 手算 / 本轮用户要求的终值；
+ *     不 require 被测模块取期望值，不拿内部常量当期望。
  *   · 状态机用假 DOM + 假计时器实跑；接线用源码静态守卫；两者成对（反例 1 的处置）。
- *   · 真浏览器几何 / 录帧部分归 CI 探针（AC-NB-07 时序、AC-NB-15/16/18 逐帧），
- *     本轮不跑探针、不出截图，故只落「静态负向 + 状态机」这一层，不伪报已覆盖。
+ *   · 真浏览器几何 / 录帧部分归 CI 探针（本轮不跑探针、不出截图，只落静态 + 状态机这一层）。
  */
 'use strict';
 
@@ -29,6 +31,8 @@ function occurrences(hay, needle) {
 
 var GAME = read('js/game.js');
 var UNDO = read('js/undoBar.js');
+var RECORDS = read('js/recordsView.js');
+var ACCOUNT = read('js/accountView.js');
 var STORAGE = read('js/storage.js');
 var SETTLE = read('js/settleView.js');
 var CSS = read('css/style.css');
@@ -38,7 +42,8 @@ var ALL_JS = SOURCES.map(function (f) { return f.src; }).join('\n');
 var createUndoBar = require('../js/undoBar.js');
 var Store = require('../js/storage.js');
 
-/* 独立期望值：全部来自规格终值表 / 手算，不引用任何被测常量 */
+/* 独立期望值：全部来自规格终值表 / 手算 / 本轮删除目标，不引用任何被测常量。
+ * MSG_* / IRREVOCABLE 这四句现在只用于**负向守卫**（必须已从 game.js 消失）。 */
 var SPEC = {
   MSG_MID: '正在离开（5 秒内可撤销）· 对局中离开算弃局，其他人这局也会结束',
   MSG_IDLE: '正在离开房间（5 秒内可撤销）',
@@ -48,8 +53,8 @@ var SPEC = {
   KEY: 'lxw_strategy_tip_seen_v1',
   KEY_NAME: 'STRATEGY_TIP_SEEN',
   GUIDE_KEY: 'lxw_guide_seen_v1',
-  WINDOW_MS: 5000,        // §2.5「沿用 DEFAULT_MS，本批不调」
-  N_MS: 250,              // AC-NB-07：与换屏动画同量级，且严格小于窗口的 1/10
+  WINDOW_MS: 5000,        // §2.5「沿用 DEFAULT_MS，本批不调」（战绩清除仍在用）
+  N_MS: 250,              // 与换屏动画同量级，且严格小于窗口的 1/10
   TIP_MIN: 28,            // §4.2 文案长度下界
   TIP_MAX: 36             // §4.2 文案长度上界
 };
@@ -118,162 +123,161 @@ function makeBar(withBar) {
   var bar = createUndoBar({ doc: doc, timers: timers, duration: SPEC.WINDOW_MS });
   return { doc: doc, timers: timers, bar: bar };
 }
-/** 按 game.js 的接线形状挂一个独立 spy：onCommit 里才真的调「离开」 */
-function wireLeaveSpy(bar, spy) {
+/** 独立 spy：onCommit 里才真的调「目标动作」。本轮离开不再走撤销条，
+ *  这里只验 UndoBar 组件自身的延迟执行语义（战绩清除仍是这个用法），
+ *  不再代表离开房间的接线。 */
+function wireDeferredSpy(bar, spy) {
   return bar.show({
     msg: SPEC.MSG_IDLE,
     onUndo: function () { spy.undone += 1; },
-    onCommit: function (reason) { spy.reasons.push(reason); spy.leaveRoom += 1; }
+    onCommit: function (reason) { spy.reasons.push(reason); spy.commits += 1; }
   });
 }
 
-/* =================== AC-NB-01 ～ 03：状态机三条规矩 =================== */
-head('[AC-NB-01] 同一时刻只允许 1 个待撤销动作，旧的立刻提交');
+/* =================== 组件状态机（战绩清除仍在使用，全部保留） =================== */
+head('[C-1] 同一时刻只允许 1 个待撤销动作，旧的立刻提交');
 {
   var t = makeBar(true);
   var log = [];
   t.bar.show({ msg: 'A', onCommit: function (r) { log.push('A:' + r); } });
   t.bar.show({ msg: 'B', onCommit: function (r) { log.push('B:' + r); } });
-  eq(log.join(','), 'A:superseded', 'AC-NB-01 旧动作立刻结账（reason=superseded）');
-  eq(t.bar.peek().msg, 'B', 'AC-NB-01 peek().msg 是后一次动作文案');
-  eq(occurrences(log.join(','), 'superseded'), 1, 'AC-NB-01 superseded == 1');
-  eq(occurrences(log.join(','), 'timeout'), 0, 'AC-NB-01 timeout == 0');
-  eq(occurrences(log.join(','), 'hidden'), 0, 'AC-NB-01 hidden == 0');
-  eq(occurrences(log.join(','), 'no-dom'), 0, 'AC-NB-01 no-dom == 0');
-  eq(t.timers.count(), 1, 'AC-NB-01 只有一个计时器（旧的已 clear，被静默丢掉的动作数 == 0）');
+  eq(log.join(','), 'A:superseded', 'C-1 旧动作立刻结账（reason=superseded）');
+  eq(t.bar.peek().msg, 'B', 'C-1 peek().msg 是后一次动作文案');
+  eq(occurrences(log.join(','), 'superseded'), 1, 'C-1 superseded == 1');
+  eq(occurrences(log.join(','), 'timeout'), 0, 'C-1 timeout == 0');
+  eq(occurrences(log.join(','), 'hidden'), 0, 'C-1 hidden == 0');
+  eq(occurrences(log.join(','), 'no-dom'), 0, 'C-1 no-dom == 0');
+  eq(t.timers.count(), 1, 'C-1 只有一个计时器（旧的已 clear，被静默丢掉的动作数 == 0）');
 }
 
-head('[AC-NB-02] 页面转后台 / 关闭立即提交，且幂等');
+head('[C-2] 页面转后台 / 关闭立即提交，且幂等');
 {
   var t = makeBar(true);
   var log = [];
   t.bar.show({ msg: 'A', onCommit: function (r) { log.push(r); } });
   t.doc.visibilityState = 'hidden';
   t.doc.fire('visibilitychange');
-  /* pagehide 由 undoBar 挂在宿主 global 上，Node 下无法派发；
-   * 用同 reason 的第二个 flush 代替它的效果，核「合计仍为 1」。 */
-  eq(t.bar.flush('hidden'), false, 'AC-NB-02 第二个后台事件是空操作（幂等）');
-  eq(log.length, 1, 'AC-NB-02 onCommit(hidden) 合计 == 1，不是 2');
-  eq(log[0], 'hidden', 'AC-NB-02 reason == hidden');
-  eq(t.bar.isPending(), false, 'AC-NB-02 状态机清空');
+  eq(t.bar.flush('hidden'), false, 'C-2 第二个后台事件是空操作（幂等）');
+  eq(log.length, 1, 'C-2 onCommit(hidden) 合计 == 1，不是 2');
+  eq(log[0], 'hidden', 'C-2 reason == hidden');
+  eq(t.bar.isPending(), false, 'C-2 状态机清空');
 }
 
-head('[AC-NB-03] 撤销条 DOM 缺失时动作照做');
+head('[C-3] 撤销条 DOM 缺失时动作照做');
 {
   var t = makeBar(false);
   var log = [];
   var shown = t.bar.show({ msg: 'A', onCommit: function (r) { log.push(r); } });
-  eq(shown, false, 'AC-NB-03 show() 返回 false');
-  eq(log.join(','), 'no-dom', 'AC-NB-03 onCommit(no-dom) == 1（动作没被吞）');
-  eq(t.timers.count(), 0, 'AC-NB-03 不留悬空计时器');
+  eq(shown, false, 'C-3 show() 返回 false');
+  eq(log.join(','), 'no-dom', 'C-3 onCommit(no-dom) == 1（动作没被吞）');
+  eq(t.timers.count(), 0, 'C-3 不留悬空计时器');
 }
 
-/* =================== AC-NB-04 / 05：0 与 1 必须成对 =================== */
-head('[AC-NB-04] 撤销后 leaveRoom == 0（延迟执行的硬证据）');
+head('[C-4] 撤销后延迟动作提交次数 == 0（延迟执行的硬证据）');
 {
   var t = makeBar(true);
-  var spy = { leaveRoom: 0, undone: 0, reasons: [] };
-  wireLeaveSpy(t.bar, spy);
-  eq(t.bar.undo(), true, 'AC-NB-04 撤销成功');
-  eq(spy.leaveRoom, 0, 'AC-NB-04 ★ 撤销后 leaveRoom == 0');
-  eq(spy.reasons.length, 0, 'AC-NB-04 onCommit 调用数 == 0');
-  eq(t.bar.isPending(), false, 'AC-NB-04 窗口结束后不再 pending');
+  var spy = { commits: 0, undone: 0, reasons: [] };
+  wireDeferredSpy(t.bar, spy);
+  eq(t.bar.undo(), true, 'C-4 撤销成功');
+  eq(spy.commits, 0, 'C-4 ★ 撤销后目标动作 == 0');
+  eq(spy.reasons.length, 0, 'C-4 onCommit 调用数 == 0');
+  eq(t.bar.isPending(), false, 'C-4 窗口结束后不再 pending');
 }
 
-head('[AC-NB-05] 到点 / flush 后 leaveRoom == 1（== 2 判红）');
+head('[C-5] 到点 / flush 后目标动作 == 1（== 2 判红）');
 {
-  /* 正向计数必须与「真有调用点」成对：只看状态机的 1 次会漏掉
-   * 「onCommit 里那句 leaveRoom 被删了」这种退化（M1 要证伪的就是它）。 */
-  var dl = (/function doLeave\(\) \{([\s\S]*?)\n    \}/.exec(GAME) || [])[1] || '';
-  ok(/RoomStore\.leaveRoom\(/.test(dl),
-    'AC-NB-05 ★ 接线前置：deferred 回调里真的有 leaveRoom 调用点（删掉即红）');
   var t = makeBar(true);
-  var spy = { leaveRoom: 0, undone: 0, reasons: [] };
-  wireLeaveSpy(t.bar, spy);
+  var spy = { commits: 0, undone: 0, reasons: [] };
+  wireDeferredSpy(t.bar, spy);
   t.timers.fireAll();
-  eq(spy.leaveRoom, 1, 'AC-NB-05 ★ 到点后 leaveRoom == 1');
-  eq(spy.reasons.join(','), 'timeout', 'AC-NB-05 reason == timeout');
+  eq(spy.commits, 1, 'C-5 ★ 到点后目标动作 == 1');
+  eq(spy.reasons.join(','), 'timeout', 'C-5 reason == timeout');
   t.timers.fireAll();
-  eq(spy.leaveRoom, 1, 'AC-NB-05 重复到点不会变成 2（双提交次数 == 0）');
+  eq(spy.commits, 1, 'C-5 重复到点不会变成 2（双提交次数 == 0）');
 
   var t2 = makeBar(true);
-  var spy2 = { leaveRoom: 0, undone: 0, reasons: [] };
-  wireLeaveSpy(t2.bar, spy2);
-  eq(t2.bar.flush('room-changed'), true, 'AC-NB-05 flush(room-changed) 返回 true');
-  eq(spy2.leaveRoom, 1, 'AC-NB-05 flush 后 leaveRoom == 1');
-  eq(t2.bar.flush('room-changed'), false, 'AC-NB-05 第二次 flush 是空操作');
-  eq(spy2.leaveRoom, 1, 'AC-NB-05 flush 不产生第二次真离开');
+  var spy2 = { commits: 0, undone: 0, reasons: [] };
+  wireDeferredSpy(t2.bar, spy2);
+  eq(t2.bar.flush('navigate'), true, 'C-5 flush(navigate) 返回 true');
+  eq(spy2.commits, 1, 'C-5 flush 后目标动作 == 1');
+  eq(t2.bar.flush('navigate'), false, 'C-5 第二次 flush 是空操作');
+  eq(spy2.commits, 1, 'C-5 flush 不产生第二次提交');
 }
 
-/* =================== AC-NB-06 ～ 09：出口 / 竞态 / 接线 =================== */
-var guardBody = (/function leaveMustCommitNow\(confirmSnap, r\) \{([\s\S]*?)\n  \}/.exec(GAME) || [])[1] || '';
-var doLeaveBody = (/function doLeave\(\) \{([\s\S]*?)\n    \}/.exec(GAME) || [])[1] || '';
-var confirmBody = (/askConfirm\(title, desc, function \(\) \{([\s\S]*?)\n    \}, \{ busyText/.exec(GAME) || [])[1] || '';
+/* =================== 本轮：离开房间「直接退」契约 =================== */
+var onLeaveBody = (/function onLeave\(\) \{([\s\S]*?)\n  \}/.exec(GAME) || [])[1] || '';
 
-head('[AC-NB-06] 五种出口各有唯一结局');
+head('[D-1] onLeave 去掉确认框 / 撤销条 / 网络快照');
 {
-  ok(/UndoBar\.flush\('room-changed'\)/.test(GAME), 'AC-NB-06 结算出口：命中即 flush(room-changed)');
-  ok(/dissolved|dissolve/.test(guardBody), 'AC-NB-06 解散出口：守卫认「已生效的解散」');
-  ok(!/ownerId|holdNext|wantNext|score|ready/.test(guardBody), 'AC-NB-06 房主转移 / 他人进出 / 分数 / ready 不进判据（仍可撤销）');
-  ok(/UndoBar\.flush\('navigate'\)/.test(GAME), 'AC-NB-06 导航出口：showScreen 会结账');
-  ok(/\.catch\(/.test(doLeaveBody), 'AC-NB-06 断网出口：leaveRoom 失败被吞，不弹离开失败');
-  ok(!/flashRoomError|alert\(/.test(doLeaveBody), 'AC-NB-06 断网不刷错误弹窗');
+  ok(!!onLeaveBody, 'D-1 找到 onLeave 函数体');
+  ok(/function onLeave\(\)/.test(GAME) && !/async function onLeave\(/.test(GAME),
+    'D-1 onLeave 是同步函数（不再 await 网络核对）');
+  ok(!/askConfirm\(/.test(onLeaveBody), 'D-1 ★ onLeave 内没有 confirm 弹窗');
+  ok(!/UndoBar\.show\(/.test(onLeaveBody), 'D-1 ★ onLeave 内没有撤销条');
+  ok(!/fetchRoomSnapshot\(/.test(GAME) && !/RoomStore\.peekRoom\(/.test(GAME),
+    'D-1 ★ 网络快照核对已删（game.js 不再调 peekRoom）');
+  ok(!/弃局离开？|确定要离开当前房间吗/.test(GAME),
+    'D-1 离开专用 confirm 文案已删（其它 confirm 的文案不在此列）');
+  eq(occurrences(onLeaveBody, 'RoomStore.leaveRoom('), 1, 'D-1 onLeave 内 leaveRoom 调用点 == 1');
+  ok(/cleanupRoom\(\)/.test(onLeaveBody), 'D-1 cleanupRoom 在 onLeave 内');
+  ok(/showScreen\('screen-home'\)/.test(onLeaveBody), 'D-1 showScreen 回首页在 onLeave 内');
 }
 
-head('[AC-NB-07] 导航中被结账：可撤销与已结算不许同时成立');
+head('[D-2] 反馈与连点：firstShown + pressBusy + 在途标记');
 {
-  ok(/function leaveMustCommitNow\(confirmSnap, r\)/.test(GAME), 'AC-NB-07 单一守卫挂在 attachRoom 订阅回调里');
-  ok(/r === null/.test(guardBody), 'AC-NB-07 P1 房间没了进判据');
-  ok(/r\.phase !== confirmSnap\.phase/.test(guardBody), 'AC-NB-07 P2 阶段推进进判据');
-  ok(/r\.players/.test(guardBody), 'AC-NB-07 P3 我已不在席位进判据');
-  ok(/settle|roundend/.test(guardBody), 'AC-NB-07 P4 本局结算事件进判据');
-  ok(/markLeaveIrrevocable\(\)/.test(GAME), 'AC-NB-07 命中后条子切「已不可撤销」');
-  ok(/disabled/.test(GAME), 'AC-NB-07 撤销入口失效');
-  ok(SPEC.N_MS < SPEC.WINDOW_MS / 10, 'AC-NB-07 N=250 严格小于 5000/10=500（手算）');
-  eq(SPEC.IRREVOCABLE.indexOf('撤销成功'), -1, 'AC-NB-07 「已不可撤销」不许出现「撤销成功」');
-  eq(SPEC.IRREVOCABLE.indexOf('已取消'), -1, 'AC-NB-07 「已不可撤销」不许出现「已取消」');
-  ok(/'room-changed'/.test(UNDO), 'AC-NB-07 room-changed 已登记进 undoBar 的 reason 注释');
+  ok(/firstShown\(\['btn-leave-spectator', 'btn-leave', 'btn-leave-game', 'btn-back-room'\]\)/.test(onLeaveBody),
+    'D-2 四个离开入口仍按可见性选按钮');
+  ok(/pressBusy\(btn, '离开中…'\)/.test(onLeaveBody),
+    'D-2 忙碌文案改为「离开中…」（不再是「核对中…」）');
+  ok(!/pressBusy\(btn, '核对中…'\)/.test(GAME), 'D-2 「核对中…」已删');
+  ok(/if \(!restore\) return;/.test(onLeaveBody), 'D-2 pressBusy 自身的连点短路保留');
+  eq(occurrences(GAME, 'var leaveInFlight = false;'), 1, 'D-2 ★ 在途标记只有一处定义');
+  ok(/if \(!state\.roomId \|\| leaveInFlight\) return;/.test(onLeaveBody),
+    'D-2 ★ 入口用 leaveInFlight 短路，连点只发一次 leaveRoom');
+  ok(!/UndoBar\.isPending\(\)/.test(onLeaveBody), 'D-2 离开不再靠共享 UndoBar 做连点短路');
 }
 
-head('[AC-NB-08] 对局中离开仍判弃局，文案不丢');
+head('[D-3] 兜底：断网 / 房间已删仍回首页，专属符号全部移除');
 {
-  ok(/'弃局离开？'/.test(GAME), 'AC-NB-08 mid 时确认框标题仍是「弃局离开？」');
-  ok(/第 ' \+ roundNo \+ ' 轮正在进行/.test(GAME), 'AC-NB-08 desc 含「第 N 轮」');
-  ok(/算弃局/.test(GAME), 'AC-NB-08 desc 含「弃局」');
-  ok(/记入战绩/.test(GAME), 'AC-NB-08 desc 含「记入战绩」');
-  ok(/其他人这局也会就此结束/.test(GAME), 'AC-NB-08 desc 含「其他人这局也会就此结束」');
+  ok(/\.catch\(function \(\) \{\}\)/.test(onLeaveBody), 'D-3 ★ leaveRoom 失败被吞，不弹「离开失败」');
+  ok(!/flashRoomError|alert\(/.test(onLeaveBody), 'D-3 onLeave 不刷错误弹窗');
+  ok(/reportBug\('onLeave', e\)/.test(onLeaveBody), 'D-3 同步抛仍上报');
+  eq(occurrences(onLeaveBody, 'showScreen(\'screen-home\')'), 1,
+    'D-3 回首页动作集中在 finish() 一处（两条路径共用，不会写两遍）');
+  ok(/\.then\(finish\)/.test(onLeaveBody) && /reportBug\('onLeave', e\);\s*finish\(\);/.test(onLeaveBody),
+    'D-3 成功 / 同步抛两条路径都调用 finish()');
+  /* 四句文案 + 所有撤销专属状态/函数必须从 game.js 彻底消失 */
+  var GONE = [
+    'LEAVE_MSG_MID', 'LEAVE_MSG_IDLE', 'LEAVE_UNDO_MSG', 'LEAVE_IRREVOCABLE',
+    'leaveConfirmSnap', 'lastRoomMeta', 'setLeaveOrigin', 'anchorLeaveBarOnSettle',
+    'leaveMustCommitNow', 'markLeaveIrrevocable', 'fetchRoomSnapshot',
+    'lastScreenId', 'function doLeave(', 'data-undo-origin'
+  ];
+  GONE.forEach(function (sym) {
+    eq(occurrences(GAME, sym), 0, 'D-3 ★ 已移除专属符号 ' + sym);
+  });
+  [SPEC.MSG_MID, SPEC.MSG_IDLE, SPEC.UNDO_MSG, SPEC.IRREVOCABLE].forEach(function (s, i) {
+    eq(occurrences(GAME, s), 0, 'D-3 ★ 离开撤销文案 ' + (i + 1) + ' 已从 game.js 消失');
+  });
+  ok(!/\[data-undo-origin="leave"\]/.test(CSS), 'D-3 CSS 里离开专属锚点规则已删（战绩条锚点不变）');
+  eq(occurrences(HTML, 'id="undo-bar"'), 1, 'D-3 仍只有一个 #undo-bar（没新建、也没删共享节点）');
 }
 
-head('[AC-NB-09] 接线守卫：leaveRoom 只在 deferred 回调里');
+head('[D-4] 共享代码保留：UndoBar 给战绩清除、askConfirm 给退出登录/删号');
 {
-  ok(!!confirmBody, 'AC-NB-09 找到 askConfirm 的确认回调');
-  eq(occurrences(confirmBody, 'RoomStore.leaveRoom('), 0, 'AC-NB-09 ★ 确认回调同步路径上 leaveRoom 调用点 == 0');
-  ok(/RoomStore\.leaveRoom\(/.test(doLeaveBody), 'AC-NB-09 ★ leaveRoom 落在 deferred 的 doLeave 里');
-  ok(/onCommit: function \(\) \{ return doLeave\(\); \}/.test(GAME), 'AC-NB-09 onCommit 接的是 doLeave');
-  ok(/cleanupRoom\(\)/.test(doLeaveBody), 'AC-NB-09 cleanupRoom 也在 deferred 里');
-  ok(/showScreen\('screen-home'\)/.test(doLeaveBody), 'AC-NB-09 showScreen 也在 deferred 里');
-  eq(occurrences(doLeaveBody, 'RoomStore.leaveRoom('), 1, 'AC-NB-09 deferred 内 leaveRoom 调用点 == 1');
-  ok(/UndoBar\.isPending\(\)/.test(GAME), 'AC-NB-09 入口有 isPending() 连点短路');
-  ok(/正在离开…/.test(GAME), 'AC-NB-09 连点提示「正在离开…」');
-  /* 守卫必须在 pwa/test/*.test.js 内，由 run-tests.js 的 DIRS 自动扫进 npm test */
-  ok(/[\\\/]test[\\\/]/.test(__filename) && /\.test\.js$/.test(__filename),
-    'AC-NB-09 ★ 本守卫位于 pwa/test/*.test.js（会被 npm test 扫到）');
+  ok(/var UndoBar = .*LXW\.undoBar/.test(GAME), 'D-4 UndoBar 单例仍在（共享组件不删）');
+  ok(/undoBar:\s*UndoBar/.test(GAME), 'D-4 仍注入 recordsView');
+  ok(/UndoBar\.flush\('navigate'\)/.test(GAME), 'D-4 showScreen 仍会结账（战绩清除）');
+  ok(/#undo-act'\)\.addEventListener\('click'/.test(GAME) && /UndoBar\.undo\(\)/.test(GAME),
+    'D-4 「撤销」按钮仍绑 UndoBar.undo()');
+  ok(/undoBar\.show\(/.test(RECORDS) && /onCommit:/.test(RECORDS),
+    'D-4 战绩清除仍走 undoBar.show + onCommit');
+  ok(/function askConfirm\(/.test(GAME), 'D-4 askConfirm 本体仍在');
+  ok(/askConfirm\(/.test(ACCOUNT), 'D-4 退出登录 / 删号的 confirm 仍可用');
+  ok(/askConfirm\(/.test(GAME.replace(onLeaveBody, '')), 'D-4 游戏内其它 confirm（不等了等）仍可用');
 }
 
-/* =================== 文案终值逐字（§2.5） =================== */
-head('[§2.5] 四句文案逐字一致，且不新增载体');
-{
-  eq(occurrences(GAME, SPEC.MSG_MID), 1, '§2.5 等待期·对局中文案在源码中恰好 1 处');
-  eq(occurrences(GAME, SPEC.MSG_IDLE), 1, '§2.5 等待期·非对局中文案在源码中恰好 1 处');
-  eq(occurrences(GAME, SPEC.UNDO_MSG), 1, '§2.5 撤销成功文案在源码中恰好 1 处');
-  eq(occurrences(GAME, SPEC.IRREVOCABLE), 1, '§2.5 已不可撤销文案终值只有一处（单一载体）');
-  ok(occurrences(GAME, 'LEAVE_IRREVOCABLE') >= 3, '§2.5 条子切换文本 / 回写都引用同一常量（不复制第二套文案）');
-  eq(occurrences(HTML, 'id="undo-bar"'), 1, '§2.6 不新建第二个撤销条 DOM');
-  ok(/\[data-undo-origin="leave"\]/.test(CSS), 'D-2 屏级锚点修饰已落 CSS');
-  ok(!/askConfirm\(title, desc[\s\S]{0,200}LEAVE_IRREVOCABLE/.test(GAME), '§2.5 不复用 askConfirm 当第三载体');
-}
-
-/* =================== AC-NB-14 ～ 18：策略引导 =================== */
+/* =================== AC-NB-14 ～ 18：策略引导（本轮未改） =================== */
 function memBacking() {
   var m = {};
   return {

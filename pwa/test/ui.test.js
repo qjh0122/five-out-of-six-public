@@ -530,28 +530,20 @@ ok(/firstShown\(\['btn-leave-spectator', 'btn-leave', 'btn-leave-game', 'btn-bac
 ok(!/state\.room\.phase !== StateMachine\.PHASE\.WAITING\) \{\s*btn = \$\('#btn-leave-game'\)/.test(gameJs),
   '★ 不再按 phase 猜是哪个页面');
 ok(/btn-leave-game[^>]*>离开房间</.test(html), '对局页文案也是「离开房间」（和另外两个入口一致）');
-ok(gameJs.indexOf('弃局离开？') >= 0, '对局中离开的确认框标题写明「弃局」');
-/* 文案要说清三件事，缺一件都可能让人误点：
- *   ① 现在走算弃局（不是免费退出）
- *   ② 第几轮（让人知道赔的是哪一局）
- *   ③ 现在多少分（让人算得出赔多少）
- * 「按你现在的分数」这种抽象说法以前就够，但玩家看不出具体数字。 */
-ok(/现在离开算弃局/.test(gameJs), '文案点了「算弃局」');
-ok(/第 ' \+ roundNo \+ ' 轮正在进行/.test(gameJs), '文案带上了第几轮');
-ok(/现在 ' \+ me\.score \+ ' 分/.test(gameJs), '文案带上了当前分数');
-ok(/其他人这局也会就此结束/.test(gameJs), '文案说明了会连累其他人');
-
-/* 判定「算不算弃局」不能只看本地 phase：手机上切后台再回来，
- * 本地可能还停在 WAITING，服务端其实已经在分牌了。 */
-ok(/function fetchRoomSnapshot/.test(gameJs), '离开前会向服务端要一次最新快照');
-ok(/RoomStore\.peekRoom\(/.test(gameJs), '走的是只读的 peekRoom');
-/* 不能用 reconnect 来读：它会补分牌时限，反复点「离开 / 取消」就能无限续命 */
-ok(!/RoomStore\.reconnect\(state\.roomId/.test(gameJs), '没有拿 reconnect 当只读接口用');
-ok(/snap = await fetchRoomSnapshot\(\)/.test(gameJs), 'onLeave 真的等了这个快照');
-ok(/pressBusy\(btn, '核对中…'\)/.test(gameJs), '核对期间按钮有「核对中…」反馈（不是点了没反应）');
-ok(/var fresh = !!snap/.test(gameJs) && /没连上服务端核对最新进度/.test(gameJs),
-  '拿不到快照时明确告知「没核对上」，不假装确认过');
-ok(/RoomStore\.getMode\(\) === 'ws'/.test(gameJs), '本地演示模式不会报「没连上服务端」');
+/* 本轮（用户要求）：离开不再弹确认框、不再有撤销条、不再核对快照。
+ * 对局中离开仍按弃局记入战绩 —— 那是服务端 leaveRoom 的职责，本端确认文案可删。 */
+ok(gameJs.indexOf('弃局离开？') < 0, '★ 离开确认框标题「弃局离开？」已删');
+ok(gameJs.indexOf('确定要离开当前房间吗') < 0, '★ 离开确认框正文已删');
+ok(!/function fetchRoomSnapshot/.test(gameJs), '★ 离开前不再向服务端要快照');
+ok(!/RoomStore\.peekRoom\(/.test(gameJs), '★ game.js 不再调 peekRoom');
+ok(!/现在离开算弃局|第 ' \+ roundNo/.test(gameJs), '★ 离开确认专用文案已删');
+ok(!/没连上服务端核对最新进度/.test(gameJs), '★ 「没核对上」降级文案已删');
+/* 反馈仍要有：忙碌态换成「离开中…」，连点由 leaveInFlight + pressBusy 双保险挡住 */
+ok(/pressBusy\(btn, '离开中…'\)/.test(gameJs), '★ 点离开立刻有「离开中…」反馈（不是点了没反应）');
+ok(/var leaveInFlight = false;/.test(gameJs) && /leaveInFlight\) return;/.test(gameJs),
+  '★ 在途标记防连点，leaveRoom 最多发一次');
+ok(/Promise\.resolve\(RoomStore\.leaveRoom\(/.test(gameJs) && /\.catch\(function \(\) \{\}\)/.test(gameJs),
+  '★ 退房尽力而为：失败被吞，不把人卡在房间');
 
 /* 确认框以前「点一下就先关、再执行回调」，删账号这种要走网络的操作于是变成
  * 弹窗立刻消失 + 十几秒无反馈，人只会反复点。 */

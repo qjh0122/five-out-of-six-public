@@ -3506,37 +3506,12 @@ body.is-dragging { cursor: grabbing; }
 }
 .undo-act:active { transform: scale(0.96); filter: brightness(0.94); }
 
-/* 离开房间的撤销条 —— 屏级锚点（design-next-batch-v1.md §2.6 / D-2）。
- * .undo-bar 的 bottom:300px 是按**战绩页**调的；离开发生在房间 / 对局 / 结算三屏，
- * 沿用会压住结算数字与 #btn-next。这里只换锚点：复用同一个 #undo-bar 节点，
- * 不新建第二个条子、不新建 DOM、不碰 v138 数字阶梯。
- * data-undo-origin 由 game.js 在 undoBar.show() 前写到条子（或屏级容器）上，
- * 提交 / 撤销时移除，所以清除战绩那条仍走原锚点。 */
-/* R17（制作人验帧发现的作用域错配）：#undo-bar 是 #stage 的**直接子元素**
- * （index.html:1300），与各 #screen-* section 是兄弟，不是后代 ——
- * 原先那三条 `#screen-room/.undo-bar …` 分屏规则**从未匹配过**，
- * 真正生效的一直是这条基础值。把 176 / 190 / 224 改来改去当然没效果。
- * 修正：删掉死规则，屏级差异改由 stage 状态标记承担（将来需要时），
- * 本批只保留一个对三屏都安全的统一锚点，并以实际渲染帧复核。 */
-.undo-bar[data-undo-origin="leave"],
-[data-undo-origin="leave"] .undo-bar {
-  bottom: 300px;
-  max-width: 92%;
-  padding-left: 20px;
-  /* 不动 gap：flex-gap-fallback.css 是从源 CSS 的 gap 声明推导的生成物，
-   * 这里只换锚点，不引入新的 gap，生成物不必重跑。 */
-}
-/* N-1（几何断言抓到的作用域内第二条错）：**结算屏的锚点不在这里写**。
- * 390×844 实测（probe-undo [10]）：底部动作区三排按钮占 CSS 630–782，
- * 上一行 #settle-wait 582–613（策略行两行时），再往上 #settle-body 到 570 ——
- * 中间没有 62px 的空档，沿用 bottom:300 的条子正好压住 #btn-next 8031px²。
- * 试过写死 481：390 改成压住等待行 2332px²，320 又压住「改把数」那一排。
- * 根因是**等待行的行数随文案和宽度变**（策略行 390 / 320 都是两行，HOLD 态一行），
- * 任何固定值都只能对一档正确。改为由 game.js 的 anchorLeaveBarOnSettle()
- * 按当时真实矩形算（同一份事实只有一处载体：这里不重复那个数值）。 */
+/* 离开房间的「撤销条屏级锚点」已随直接退一起移除：game.js 不再写入
+ * 该屏级锚点属性，这一条规则已经没有写入方，删掉避免留死代码。
+ * 撤销条本体保留给战绩清除用，锚点仍是上面 .undo-bar 的 bottom:300px
+ * （按战绩页调的），本轮没有改动。 */
 /* R14：320 档缩放后 .undo-act 的 88 设计px ≈ 38 CSS px，低于 40 触摸判据。
- * 只给紧凑竖屏补到 96 设计px（≈41 CSS px），不动全局 —— 全局改会顶高条子、
- * 连带影响上面三屏锚点。 */
+ * 只给紧凑竖屏补到 96 设计px（≈41 CSS px），不动全局 —— 全局改会顶高条子。 */
 .compact-v:not(.wide-stage) .undo-act { min-height: 96px; }
 
 /* ============================================================
