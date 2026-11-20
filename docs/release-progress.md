@@ -38,7 +38,8 @@
 | 项 | 现在的值 | 怎么复算 |
 |---|---|---|
 | 线上版本 | `20261120h` / sw `v159` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
-| 线上核对 | **15/15 通过**（2026-11-11 指定头像版 `20261111c` 发布后实跑；版本号回读 = `20261111c`，无 JS 异常 / 无 console.error / 无 HTTP≥400 / SW 已接管 / installability 0 错） | `node scripts/probe-online-smoke.js <url>` |
+| 线上核对 | **15/15 通过**（2026-11-20 音效改造版 `20261120h` 发布后实跑；版本号回读 = `20261120h`，manifest 图标 data URI 注入正常、无 screenshots 死链、installability 0 错、无 JS 异常 / console.error / HTTP≥400 / SW 已接管） | `node scripts/probe-online-smoke.js <url>` |
+| 部署方式（★ 别再用错） | 必须从**项目根**以 **node / http-service** 部署（`workbuddy_sites_deploy` directory=仓库根、language=node），sandbox `74c12371a7504089906cb1387afd7908`。**不能**用 `language=static` + directory=`pwa/`——那样没有 `server/index.js` 运行时注入 manifest 图标 data URI，线上图标会退化成 `/icons/*.png`（被网关剥 sharecode 后 403），冒烟 13/15。2026-11-20 音效发布踩过一次，已即时纠正。 | `curl -s "<url>/manifest.webmanifest?sharecode=<sc>" \| grep -o 'data:image/png' \| head -1` 应命中 |
 | 指定头像 | **5 人**（playerId → 文件名见 `pwa/js/avatar.js` 的 CUSTOM 表；仓库里不写昵称）。`pwa/assets/avatar-custom/` 下 5 张 128×128 webp，线上逐个 200 `image/webp`、体积与本地一致；映射键是 playerId 不是昵称。其余玩家仍走 48 款预设 | `curl -o /dev/null -w '%{http_code} %{size_download}' "<url>/assets/avatar-custom/will.webp?sharecode=<sc>"` |
 | 牌堆 | **54 张**（52 真牌 + 大王 + 小王）。小王 2026-11-12 加入，rank 14.5；两张王功能完全一样（都万能），只有「该比王的地方」大王才压小王 | `node -e "console.log(require('./pwa/js/card.js').createDeck().length)"` |
 | 成就目录 | **39 条**（牌型 8 / 对撞 8 / 通吃通赔 8 / 战绩 15）。稀有度按线上实测标定，不是拍的：legend 12 · epic 3 · rare 8 · normal 18 | `npm run ach:unlock-stats` |
