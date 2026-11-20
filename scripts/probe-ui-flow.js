@@ -118,6 +118,13 @@ function cdpConnect(wsUrl) {
     const waiting = new Map();
     ws.addEventListener('message', (ev) => {
       const msg = JSON.parse(ev.data);
+      if (process.env.DEBUG_CDP && msg.method === 'Runtime.exceptionThrown') {
+        console.log('[JS异常] ' + JSON.stringify(msg.params && msg.params.exceptionDetails));
+      }
+      if (process.env.DEBUG_CDP && msg.method === 'Runtime.consoleAPICalled') {
+        const a = (msg.params && msg.params.args || []).map((x) => x.value || x.description || '').join(' ');
+        console.log('[console] ' + a);
+      }
       if (msg.id && waiting.has(msg.id)) {
         const w = waiting.get(msg.id);
         waiting.delete(msg.id);

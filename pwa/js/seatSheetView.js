@@ -469,6 +469,7 @@
     var sent = RoomStore.sendEmoji(state.roomId, state.myId, to, id);
     if (!sent) { flash('表情没发出去，别人没看到；回到牌桌再点一次'); return; }
     closeSeatSheet();
+    Sfx.play('emoji_send', 1.06);   // v155：我发出的表情，复用 receive 音色但更轻、更高
   }
 
   /* 收到一条（自己发的也走这里）。过滤规则与「谁能看见」一致：
@@ -930,6 +931,8 @@
     /* 顶栏没画出来（比如人在战绩页）：这条就不显示了，不抛错、不排队 ——
      * 表情是「此刻」的东西，补播一条 3 秒前的表情比不播更奇怪。 */
     if (!fromEl && !toEl) return;
+    /* v155：真正要显示这一条时才响；自己发的已在 sendEmojiNow 响过，不重复。 */
+    if (ev.from !== state.myId) Sfx.play('emoji_receive');
     if (!fromEl) fromEl = toEl;
     if (!toEl) toEl = fromEl;
     var fromR = fromEl.getBoundingClientRect();

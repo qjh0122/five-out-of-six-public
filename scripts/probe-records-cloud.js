@@ -12,6 +12,10 @@
  * 服务端的口径已经由 server/test/me-records.test.js 锁住了，两件事分开验更好定位。
  *
  * 用法：node scripts/probe-records-cloud.js [宽] [高] [输出目录]
+ *
+ * v153 更正：v130 backlog 写的是「竞态 51/1 对 52/0」，实跑 49/3 且三次同一组红 ——
+ * 根因是 v113 术语统一（场 → 局）后三条逐字断言过期，不是等待时序。
+ * 修的是期望字符串，不是判据强度；项数由 probes.json 的 expect=52 锁住。
  */
 'use strict';
 
@@ -65,7 +69,7 @@ function buildProfile() {
     bestNet: 39, updatedAt: NOW,
     /* 刻意让它**大于** aiRecent 的行数（+2）：aiRecent 也是 20 条上限，
      * 只跟 AI 练球的人真会碰上「说明写 5 局、列表只列 3 行」。
-     * 这里就是要跑到那个分支，验证说明行会补「列表近 3 场」。 */
+     * 这里就是要跑到那个分支，验证说明行会补「列表近 3 局」（v113 术语统一）。 */
     aiGames: aiRecent.length + 2,
     recent: recent,
     aiRecent: aiRecent
@@ -397,7 +401,9 @@ async function main() {
   eq(info.bestWin, '7', '最长连胜 7');
   eq(info.bestLose, '3', '★ 最长连败 3（这字段是新加的，以前服务端没有）');
   eq(info.rows, 23, '★ 列表 23 行 = 20 条人类流水（服务端上限）+ 3 条人机流水');
-  eq(info.count, '共 25 场 · 列表近 20 场', '★ 场次多于流水时把口径写明，不是含糊的「共 25 场」');
+  /* v153：v113 把术语从「场」统一成「局」（一局 = 一次完整对局）。
+   * 仍是**逐字相等**的强断言：少写「列表近 20 局」或多一个空格都会红。 */
+  eq(info.count, '共 25 局 · 列表近 20 局', '★ 场次多于流水时把口径写明，不是含糊的「共 25 局」');
   eq(info.firstNet, '+39', '最新一局 +39');
   eq(info.firstPeople, '3 人', '★ 人数来自服务端流水（以前只有本机记录才有）');
   eq(info.firstReason, '分数见底结束', '★ 结束原因是人话，不是 scoreZero');
@@ -492,10 +498,10 @@ async function main() {
    * 所以这里两件事都要成立：数字里没有它们，列表里必须有它们，并且标出来。 */
   eq(info.aiNoteHidden, false, '★ 说明行显示了（有 5 场人机局）');
   /* 假档案的 aiGames = 5，而 aiRecent 只有 3 条 —— 就是要走「说明比行数多」这条分支。
-   * 用户 2026-10-28 的第 3 条反馈（「要」）要的就是这个：「列表近 N 场」必须出现，
+   * 用户 2026-10-28 的第 3 条反馈（「要」）要的就是这个：「列表近 N 局」必须出现，
    * 否则玩家数不满列表只会以为数据丢了。 */
-  eq(info.aiNoteText || '', '5 场 · 列表近 3 场 · 不计入战绩与排行榜',
-    '★ 说明行：场数 + 列表近 N 场 + 不计入');
+  eq(info.aiNoteText || '', '5 局 · 列表近 3 局 · 不计入战绩与排行榜',
+    '★ 说明行：局数 + 列表近 N 局 + 不计入');
   ok(/不计入战绩与排行榜/.test(info.aiNoteText || ''), '★ 说明行写清影响：不计入战绩与排行榜');
   ok(info.aiNoteH > 0, '★ 说明行真的占了高度（不是被 hidden 之类的 0 高元素骗过去）', 'h=' + info.aiNoteH);
   eq(info.aiNoteOverflow, false, '★ 变长之后说明行没有被裁（横竖都没溢出）');
@@ -554,7 +560,7 @@ async function main() {
   eq(modal.checked, true, '★ 云端勾选默认打开（用户说「删」就是想删干净）');
   eq(modal.disabled, false, '已登录时勾选框可用');
   eq(modal.dimmed, false, '没有置灰');
-  eq(modal.count, '当前 25 场记录将被删除', '提示的是云端场次');
+  eq(modal.count, '当前 25 局战绩将被删除', '提示的是云端局数');
   eq(modal.textInside, true, '★ 勾选说明没有溢出边框（文字右缘在框内）',
     'textRight ' + modal.textRight + ' vs boxRight ' + modal.boxRight);
 

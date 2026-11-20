@@ -113,6 +113,8 @@
       };
       act.textContent = cfg.action || '撤销';
       render();
+      /* v155（B 级复用）：出现复用 hint；到期在 commit 里保持静默。 */
+      if (typeof Sfx !== 'undefined' && Sfx && typeof Sfx.play === 'function') Sfx.play('hint_guide');
       pend.timer = timers.set(function () { commit('timeout'); }, ms);
       return true;
     }
@@ -123,6 +125,7 @@
       pend = null;
       stopTimer(p);
       render();
+      if (typeof Sfx !== 'undefined' && Sfx && typeof Sfx.play === 'function') Sfx.play('select', 0.9);
       try {
         if (typeof p.onUndo === 'function') p.onUndo();
       } catch (e) {

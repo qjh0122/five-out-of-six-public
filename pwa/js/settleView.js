@@ -512,7 +512,9 @@
      *   不该跟着第几幕变调（变调表达的是「进度」，两个意思混在一起就都听不出来了）。
      * 这一幕已经响过（特写起手那一声），不再补一次 —— 不然 1.6 秒里响两次。 */
     if (!heroNow && i > 0 && !BIG_FX[groups[i].winnerTypeName]) {
-      Sfx.play('win', 1 + i * 0.05);
+      /* v155：去掉按「第几幕」递升的假进度音高——幕数不是名次。
+       * 谁赢了 / 我输没输由 game.js 按我的名次选 win/lose/champion_fanfare。 */
+      Sfx.play('win');
     }
 
     if (seq.timer) clearTimeout(seq.timer);

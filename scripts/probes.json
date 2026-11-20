@@ -1,6 +1,6 @@
 {
   "note": "探针台账（v129）。每个 scripts/probe-*.js 必须在这里有一条，否则 pwa/test/probe-ledger.test.js 会红。run 只有三档：ci（每次 push 都跑）/ manual（发版前跑一次）/ oneshot（一次性诊断，保留作复现脚本，不排期）。为什么要有这份清单见 docs/PROBES.md。",
-  "version": "v153",
+  "version": "v155",
   "probes": [
     {
       "file": "probe-ui-flow.js",
@@ -18,10 +18,11 @@
     },
     {
       "file": "probe-big-fx.js",
-      "what": "牌型特写动画在大牌型下不重叠、不挡结算行",
-      "run": "manual",
-      "why": "表现的是动画时序与叠放，无头环境里的帧率不可信；靠人眼在真机上看一眼更快",
-      "lastVerified": "v129"
+      "what": "牌型特写动画在大牌型下不重叠、不挡结算行：CSS 类名 → 爆发层 → 粒子起点 / 半径 / 裁切（390×844）",
+      "run": "ci",
+      "why": "v153 收编：21 项全绿、单次约 4 秒；验的是 CSS 画出来的几何（元素可见/裁切/粒子起点），不是主观帧率；挂在 journey job 复用已装好的浏览器",
+      "expect": 21,
+      "lastVerified": "2026-11-20"
     },
     {
       "file": "probe-create-modal.js",
@@ -76,11 +77,11 @@
     },
     {
       "file": "probe-first-paint.js",
-      "what": "首屏第一帧：登录态未定时不许闪出错误的那一屏",
-      "run": "manual",
-      "why": "要抓的是 CSS 应用后、JS 判定登录态前的那一帧，需要真实的网络节流窗口；CI 里的机器快慢会让「那一帧」时有时无",
-      "lastVerified": "v130",
-      "expect": 12
+      "what": "首屏第一帧：登录态未定时不许闪出错误的那一屏（390×844）",
+      "run": "ci",
+      "why": "v153 收编：它把 game.js 挡成 404 后**冻结**首帧，不依赖机器快慢；12 项全绿、单次约 14 秒，补的是「boot 前那一帧」这个 journey/ui-flow 都看不到的窗口",
+      "expect": 12,
+      "lastVerified": "2026-11-20"
     },
     {
       "file": "probe-flex-gap.js",
@@ -98,10 +99,11 @@
     },
     {
       "file": "probe-handlimit-settle.js",
-      "what": "「打满把数结束」与「分数见底结束」是同一套结算界面",
+      "what": "打满把数收尾与结算后下一步：同一套结算屏、按钮可点、点「开始下一局」直接开新一把且沿用 3 把档位",
       "run": "manual",
-      "why": "v130 更正：未单独复现。按 ten-hands 的形状，4 条红里至少 2 条是流程口径（v116）而非文案，修之前必须先跑一遍定性",
-      "lastVerified": ""
+      "why": "分钟级（要真打两局），夜间 manual 链执行；v153 实跑定性并修掉过期文案/流程口径，验证点由 run-probes 的 expect 锁定",
+      "expect": 25,
+      "lastVerified": "2026-11-20"
     },
     {
       "file": "probe-install.js",
@@ -178,8 +180,9 @@
       "file": "probe-records-cloud.js",
       "what": "战绩页的云端数据源：登录后读到的是服务端档案，不是本机兜底",
       "run": "oneshot",
-      "why": "v130 更正：不是「假红」，是竞态型不稳定 —— QA 实测 52/0 全绿，我这一轮是 51/1。卡在收编三条件的第 2 条（稳定），进 CI 会制造偶发红",
-      "lastVerified": ""
+      "why": "v153 更正：v130 记的竞态实为「场/局」术语统一后 3 条文案断言过期（49/3 稳定复现）；修后连跑 3 次 52/0，项数由 expect 锁定。仍属诊断脚本，不进 CI",
+      "expect": 52,
+      "lastVerified": "2026-11-20"
     },
     {
       "file": "probe-records.js",
@@ -234,10 +237,11 @@
     },
     {
       "file": "probe-table-ready.js",
-      "what": "准备态长在牌桌上（v82 §3）：准备按钮 / 倒计时 / 名单同步",
+      "what": "准备态长在牌桌上（v82 §3）：准备按钮 / 倒计时 / 名单同步（含 844×390 横屏两栏不重叠）",
       "run": "manual",
-      "why": "每次都会跑：多账号准备态时序，单测覆盖状态机、这条守「界面上真的出现在牌桌上」",
-      "lastVerified": ""
+      "why": "多账号准备态时序，单测覆盖状态机、这条守「界面上真的出现在牌桌上」；v153 连跑 3 次 34/0，v130 的「横屏崩溃」未复现，项数由 expect 锁定",
+      "expect": 34,
+      "lastVerified": "2026-11-20"
     },
     {
       "file": "probe-table.js",

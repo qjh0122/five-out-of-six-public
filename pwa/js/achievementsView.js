@@ -214,10 +214,24 @@
       + '</button>';
   }
 
+  /* v155：成就解锁音的接线点。
+   * 成就页本身是纯渲染器，服务端也没有「刚解锁」推送；由 game.js 在拿到自己的档案后
+   * 调这里，比较本次会话上一次读到的数量。第一次打开只记数、不响——打开页面不是解锁。 */
+  var lastSeenUnlocked = null;
+  function announceUnlock(count, isMe) {
+    var n = Number(count) || 0;
+    var prev = lastSeenUnlocked;
+    lastSeenUnlocked = n;
+    if (!isMe || prev === null || n <= prev) return false;
+    if (typeof Sfx !== 'undefined' && Sfx && typeof Sfx.play === 'function') Sfx.play('achievement');
+    return true;
+  }
+
   return {
     pageHtml: pageHtml,
     entryRowHtml: entryRowHtml,
     rateText: rateText,
-    esc: esc
+    esc: esc,
+    announceUnlock: announceUnlock
   };
 });

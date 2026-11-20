@@ -3057,7 +3057,9 @@ body.is-dragging { cursor: grabbing; }
   align-items: center;
   /* 右边距比左边宽一档（30 vs 18）：尾部箭头（.settle-go）要住在这块留白里。 */
   padding: 18px 30px 18px 18px;
-  margin-bottom: 12px;
+  /* v155（B-L7 范围锁）：只收名次行间距，不动字号/按钮造型/结构。
+   * 12→7 设计 px × 5 行 ≈ 18 实际 px（390 竖屏 scale≈0.52）。 */
+  margin-bottom: 7px;
   background: rgba(0, 0, 0, 0.24);
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: var(--r-card);
@@ -3261,11 +3263,11 @@ body.is-dragging { cursor: grabbing; }
 /* 分到最优时没有对比数字，只有一句结论 + 那个数 */
 .settle-recheck .sr-note { color: var(--gold); }
 
-.settle-tip { font-size: var(--fs-4); color: var(--gray-aux); text-align: center; margin: 10px 0; line-height: 1.5; }
+.settle-tip { font-size: var(--fs-4); color: var(--gray-aux); text-align: center; margin: 5px 0; line-height: 1.5; }
 /* 含 AI 的局：这一句是「结论」不是「公式」，所以用金色提到前面一档。
  * 玩家看完结算就要判断「我这把算不算战绩」，漏掉它只会以为数据丢了。 */
 .settle-ai-note {
-  margin: 2px 0 10px;
+  margin: 2px 0 6px;
   font-size: var(--fs-4);
   text-align: center;
   color: var(--gold);
@@ -3275,8 +3277,9 @@ body.is-dragging { cursor: grabbing; }
 /* 本局冠军（v115 C-1）：结算页顶部的收尾块。
  * 打了半小时之后，玩家需要一个「谁赢了」的答案，而不是自己去表里找皇冠图标。 */
 .settle-crown {
-  margin: 4px 0 16px;
-  padding: 18px 16px;
+  /* v155（B-L7）：冠军块上下边距与内边距各收一档；字号与金色块造型不动。 */
+  margin: 2px 0 8px;
+  padding: 14px 16px;
   border-radius: var(--r-card);
   text-align: center;
   background: linear-gradient(180deg, rgba(245, 193, 92, 0.16), rgba(245, 193, 92, 0.04));
@@ -3296,7 +3299,7 @@ body.is-dragging { cursor: grabbing; }
 .sc-gap { margin: 6px 0 0; font-size: var(--fs-4); color: var(--gray-aux); }
 
 .settle-reset-note {
-  margin: 2px 0 10px;
+  margin: 2px 0 6px;
   font-size: var(--fs-4);
   text-align: center;
   color: var(--gray-aux);
@@ -5593,7 +5596,8 @@ a:focus-visible {
 .hand-limit-row {
   display: flex;
   gap: 10px;
-  margin: 0 0 28px;
+  /* v155（B-L7）：尾注段间距回收；档位块本身 112px 高、五档全保留。 */
+  margin: 0 0 18px;
 }
 .hand-limit-chip {
   flex: 1;

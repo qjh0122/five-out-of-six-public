@@ -5,6 +5,7 @@
  *  - 导航请求（/ 与页面跳转）：network-first（保证打开最新版，离线回退缓存）
  *  - 脚本/样式（/js/* /css/*）：**cache-first，只认 URL 全等**
  *    （`?v=` 就是 app-version，是内容指纹；同版本第二次打开一条请求都不发）
+ *    install 时就把 `?v=<当前版本>` 写进缓存键（C7），与页面引用精确对齐：首访不再白下两遍。
  *  - 静态资源（/icons/* /assets/* /manifest.webmanifest）：cache-first（不常变、省流量）
  *  - /version.json：纯网络、不缓存、不预缓存（版本自检的真源，必须是服务器当前值）
  *  - /ws（WebSocket）与 /api：不拦截（联机必须在线）
@@ -15,7 +16,7 @@
  *
  * CACHE_NAME 每次发布 bump（v1→v2→…），activate 时清理旧缓存。
  */
-const CACHE_NAME = 'weile-liuxuanwu-v153';
+const CACHE_NAME = 'weile-liuxuanwu-v155';
 
 /* network-first 的超时上限。
  *
@@ -94,9 +95,30 @@ function withShare(u) {
   return u + (u.indexOf('?') >= 0 ? '&' : '?') + SHARE_QUERY.slice(1);
 }
 
+/* C7：js/css 的 **缓存键**要带 app-version，与 index.html 的 `?v=` 逐字一致。
+ * 注意 withShare() 只用于**网络请求**（生产网关每个请求都要 sharecode）；页面侧
+ * 的 script/link 并不带 sharecode，所以真正被命中的键是这里生成的「只有 ?v=」那一版。
+ * 两个键指向同一份响应：少一个则首访白下一遍（原来的 35 裸 + 35 版本化）。 */
+function withAppVersion(u, v) {
+  if (!v || !/^\/(js|css)\//.test(u)) return u;
+  return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(v);
+}
+
+/* app-version 的真源只有 index.html 的 meta。SW 不另存常量 —— 多一份副本就多一处
+ * 会漂移的真源，而漂移的后果正是「HTML 新、JS 旧」那次小王事故。 */
+function parseAppVersion(text) {
+  try {
+    var m = /<meta\s+name=["']app-version["']\s+content=["']([^"']+)["']/.exec(text || '');
+    return m ? m[1] : '';
+  } catch (e) { return ''; }
+}
+
 /* /version.json **故意不在 PRECACHE 里**：它是版本自检的真源，
  * 预缓存 = 把上线那一刻的版本号冻在客户端，此后自检永远报「一致」。
- * 它在 fetch 事件里单独走纯网络分支（见下方）。 */
+ * 它在 fetch 事件里单独走纯网络分支（见下方）。
+ *
+ * 下面仍写裸路径（清单是「要预缓存哪些文件」，不是缓存键本身）。install 会按
+ * withAppVersion() 给 /js/* 与 /css/* 加当前 `?v=`，再经 withShare() 拼网关凭据。 */
 const PRECACHE = [
   '/',
   '/index.html',
@@ -204,30 +226,73 @@ self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function (cache) {
-        /* 逐个容错 add：单个资源 404 不能整个 install 失败，否则连 SW 都装不上。
-         * 但**失败必须留下痕迹** —— 之前这里是 `.catch(() => null)`，
-         * 生产上 30 个资源集体 403 也一声不响，离线能力等于零而没人知道。
-         * 现在收集失败项：控制台打一条带 URL 清单的警告，并挂到 self 上供诊断页读取。 */
-        return Promise.all(PRECACHE.map(function (u) {
-          var url = withShare(u);
-          return cache.add(url).then(function () { return null; })
-            .catch(function (e) { return { url: url, err: (e && e.message) || 'failed' }; });
-        })).then(function (results) {
-          var failed = results.filter(Boolean);
-          self.__precacheReport = {
-            total: PRECACHE.length,
-            failed: failed.length,
-            detail: failed,
-            sharecode: !!SHARE_QUERY,
-            at: Date.now()
-          };
-          if (failed.length) {
-            /* 一条警告说清楚：多数情况是 sharecode 没带上（全部失败）或个别资源改名 */
-            console.warn('[sw] 预缓存失败 ' + failed.length + '/' + PRECACHE.length
-              + ' 条' + (SHARE_QUERY ? '' : '（本次未带 sharecode，生产网关会全部 403）') + '：');
-            failed.forEach(function (f) { console.warn('  - ' + f.url + '  ' + f.err); });
-          }
-        });
+        /* C7：index.html **只抓一次**，同时干两件事：
+         *   ① 写离线兜底需要的 '/' 与 '/index.html' 两条缓存键（原来 PRECACHE 里各一条）；
+         *   ② 从它的 meta 读当前 app-version，给 js/css 的预缓存键加 ?v=。
+         * 单独再 fetch 一次 index.html 只为了读版本号会白下 92KB，与 C7 省流量的目标相反。 */
+        var indexUrl = withShare('/index.html');
+        return fetch(indexUrl, { cache: 'no-store' })
+          .then(function (res) {
+            if (!res || !res.ok) throw new Error('HTTP ' + (res && res.status));
+            var textP = res.clone().text();
+            var putP = Promise.all([
+              cache.put(indexUrl, res.clone()),
+              cache.put(withShare('/'), res.clone())
+            ]);
+            /* 正文和写入都完成后再取版本：clone 必须在 body 被读之前建立（上面已 clone）。 */
+            return Promise.all([textP, putP]).then(function (got) { return parseAppVersion(got[0]); });
+          })
+          .catch(function (e) {
+            /* 读不到版本就退回旧行为（裸路径键），离线能力不能因此整片废掉；但要留痕迹。 */
+            console.warn('[sw] 读不到 index.html/app-version，本次预缓存退回无版本键：'
+              + ((e && e.message) || 'failed'));
+            return { appVersion: '', failed: { url: indexUrl, err: (e && e.message) || 'failed' } };
+          })
+          .then(function (r) {
+            var appVersion = typeof r === 'string' ? r : r.appVersion;
+            var indexFailures = (r && r.failed) ? [r.failed] : [];
+            /* 逐个容错 add：单个资源 404 不能整个 install 失败，否则连 SW 都装不上。
+             * 但**失败必须留下痕迹** —— 之前这里是 `.catch(() => null)`，
+             * 生产上 30 个资源集体 403 也一声不响，离线能力等于零而没人知道。
+             * 现在收集失败项：控制台打一条带 URL 清单的警告，并挂到 self 上供诊断页读取。 */
+            return Promise.all(PRECACHE.map(function (u) {
+              if (u === '/' || u === '/index.html') return null; // 上面已抓并写了，别再下一遍
+              var canonical = withAppVersion(u, appVersion);
+              var url = withShare(canonical);
+              /* ★ C7 真正省流量的一刀：defer 脚本在 load 之前就请求完了，SW 的 install
+               * 是在页面 load 时才注册的，所以页面**已经**按 `?v=<当前版>` 取过并写进缓存。
+               * 先查同版本键在不在：在就跳过，不再为同一份内容发第二遍网络请求。
+               * 查的是**精确键**（带 v），不是 ignoreSearch —— 老版本条目不会被当成命中。 */
+              var hitKey = (canonical !== u) ? canonical : url;
+              return cache.match(hitKey).then(function (already) {
+                if (already) return null;
+                return cache.add(url).then(function () {
+                  if (canonical === url) return null;
+                  /* 网络键带 sharecode、页面键只有 ?v=：把同一份响应写进页面会精确命中的那个键。 */
+                  return cache.match(url).then(function (cached) {
+                    if (!cached) return { url: canonical, err: 'alias source missing' };
+                    return cache.put(canonical, cached.clone()).then(function () { return null; })
+                      .catch(function (e) { return { url: canonical, err: (e && e.message) || 'alias failed' }; });
+                  });
+                }).catch(function (e) { return { url: url, err: (e && e.message) || 'failed' }; });
+              });
+            })).then(function (results) { return indexFailures.concat(results.filter(Boolean)); });
+          })
+          .then(function (failed) {
+            self.__precacheReport = {
+              total: PRECACHE.length,
+              failed: failed.length,
+              detail: failed,
+              sharecode: !!SHARE_QUERY,
+              at: Date.now()
+            };
+            if (failed.length) {
+              /* 一条警告说清楚：多数情况是 sharecode 没带上（全部失败）或个别资源改名 */
+              console.warn('[sw] 预缓存失败 ' + failed.length + '/' + PRECACHE.length
+                + ' 条' + (SHARE_QUERY ? '' : '（本次未带 sharecode，生产网关会全部 403）') + '：');
+              failed.forEach(function (f) { console.warn('  - ' + f.url + '  ' + f.err); });
+            }
+          });
       })
       .then(function () { return self.skipWaiting(); })
   );
@@ -297,8 +362,9 @@ function networkFirst(req, timeoutMs) {
  * 对 rank 15 / 14.5 的绘制调用序列完全相同）确认了这条链。
  *
  * 两个刻意的取舍：
- *   ① 缓存条目**没有 v** 视为可用。PRECACHE 写的是裸路径（withShare 只拼 sharecode），
- *      那批文件是**本次 install** 写的，一定同期；不放行会把离线能力整片废掉。
+ *   ① 缓存条目**没有 v** 视为可用。C7 之后 PRECACHE 写的是带 v 的键，这条只为
+ *      历史/异常写入的无 v 条目兜底（例如 C7 前残留的缓存、读不到 meta 时退回的写入）；
+ *      不放行会把那些场景的离线能力整片废掉。**它不是省流量的口子**：有 v 且不一致一律拒绝。
  *   ② 有 v 但不一致 → 返回 null（这次请求就失败了）。宁可让控制台明确报一个缺失，
  *      也不静默跑旧代码 —— 静默跑旧代码的代价是「已经修好的 bug 在用户那边原样复现」，
  *      而且没有任何人看得出来。

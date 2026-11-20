@@ -113,7 +113,10 @@ console.log('\n[4] 四拍：3 / 2 / 1 / 开始');
   /* 重启 keyframes：只改 class 不会重跑动画，4 拍里只有第一拍会动 */
   ok(/classList\.remove\('tick'\)[\s\S]{0,80}?void box\.offsetWidth[\s\S]{0,80}?classList\.add\('tick'\)/.test(body),
     '★ 先摘 class、强制回流、再挂上（否则后三拍静止换字，看起来像卡住）');
-  ok(/Sfx\.play\('select'/.test(body), '每拍有声音（开局那一下的仪式感主要在声音上）');
+  /* v155：倒计时从 select 拆成 countdown_tick / countdown_go 两个独立事件；
+   * 仍要「每拍有声音」，但不再借用全站 UI 点击音。 */
+  ok(/Sfx\.play\(txt === '开始' \? 'countdown_go' : 'countdown_tick'/.test(body),
+    '★ 每拍有声音（3/2/1 走 countdown_tick，开始走 countdown_go）');
 }
 
 /* ---------- 5. 接线：元素、样式、调用点 ---------- */

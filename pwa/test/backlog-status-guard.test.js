@@ -5,14 +5,16 @@
  * docs/BACKLOG.md，每行尾部残留 \r 导致 49 条一条都命不中；--check 因为
  * unknown=0 而 exit 0 —— 一个「永远绿」的假门禁。修完必须有人盯着它别回潮。
  *
- * 期望值是独立来源（grep），不是解析器自己算出来的：
- *   grep -c '^### ' docs/BACKLOG.md                  -> 49（条目数）
+ * 期望值是独立来源（grep），不是解析器自己算出来的。
+ * 2026-11-20 文档清理后从 49 条降到 44 条（watch 7→2：B-L1/L2/L3/L4/L5
+ * 及 B-L6 的 a/c/d 三项判「删」，保留 B-L6-b 与 B-L7）：
+ *   grep -c '^### ' docs/BACKLOG.md                  -> 44（条目数）
  *   grep -c '<!-- STATUS: open' docs/BACKLOG.md      -> 2
  *   grep -c '<!-- STATUS: closed' docs/BACKLOG.md    -> 38
  *   grep -c '<!-- STATUS: record' docs/BACKLOG.md    -> 2
- *   grep -c '<!-- STATUS: watch' docs/BACKLOG.md     -> 7
- * 注：grep -c '<!-- STATUS:' 是 50 —— 第 734 行是正文里的示例
- * `<!-- STATUS: … -->`，不是条目；所以条目锚点用 '^### ' 的 49。
+ *   grep -c '<!-- STATUS: watch' docs/BACKLOG.md     -> 2
+ * 注：grep -c '<!-- STATUS:' 是 45 —— 正文里那行示例
+ * `<!-- STATUS: … -->`，不是条目；所以条目锚点用 '^### ' 的 44。
  *
  * 负向样本用 --file 指向临时文件，绝不临时改真实 BACKLOG.md 再还原。
  */
@@ -40,7 +42,7 @@ function eq(a, b, name) {
 const ROOT = path.join(__dirname, '..', '..');
 const SCRIPT = path.join(ROOT, 'scripts', 'backlog-status.js');
 const REAL = path.join(ROOT, 'docs', 'BACKLOG.md');
-const EXPECTED = { total: 49, open: 2, closed: 38, record: 2, watch: 7, unknown: 0 };
+const EXPECTED = { total: 44, open: 2, closed: 38, record: 2, watch: 2, unknown: 0 };
 
 function runCli(args) {
   return spawnSync(process.execPath, [SCRIPT].concat(args), { cwd: ROOT, encoding: 'utf8' });
@@ -51,30 +53,30 @@ const items = BS.parse(raw);
 const by = BS.summarize(items);
 
 console.log('\n[A] 真实 CRLF 文档：解析数 == 独立 grep 锚点');
-eq(items.length, EXPECTED.total, '★ 49 条（回归时这里是 0）');
+eq(items.length, EXPECTED.total, '★ 44 条（回归时这里是 0）');
 eq(by.open.length, EXPECTED.open, 'open 2 条');
 eq(by.closed.length, EXPECTED.closed, 'closed 38 条');
 eq(by.record.length, EXPECTED.record, 'record 2 条');
-eq(by.watch.length, EXPECTED.watch, 'watch 7 条');
+eq(by.watch.length, EXPECTED.watch, 'watch 2 条');
 eq(by.unknown.length, EXPECTED.unknown, 'unknown 0 条');
 
 console.log('\n[B] CLI 形态与 --check');
 const r1 = runCli([]);
 eq(r1.status, 0, '无参数退出 0');
-ok((r1.stdout || '').indexOf('BACKLOG 条目 49 条') >= 0, '★ 输出 49 条');
+ok((r1.stdout || '').indexOf('BACKLOG 条目 44 条') >= 0, '★ 输出 44 条');
 const r2 = runCli(['--check']);
 eq(r2.status, 0, '★ 干净文档 --check 退出 0');
 
 console.log('\n[C] 负向与跨行尾');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'backlog-guard-'));
 try {
-  /* 同内容换成纯 LF：必须仍解析 49 条（不能只修 CRLF） */
+  /* 同内容换成纯 LF：必须仍解析 44 条（不能只修 CRLF） */
   const lfText = raw.split('\r\n').join('\n');
   const lfFile = path.join(tmp, 'same-content-lf.md');
   fs.writeFileSync(lfFile, lfText, 'utf8');
   const r3 = runCli(['--file', lfFile]);
   eq(r3.status, 0, 'LF 样本退出 0');
-  ok((r3.stdout || '').indexOf('BACKLOG 条目 49 条') >= 0, '★ LF 同内容仍解析 49 条');
+  ok((r3.stdout || '').indexOf('BACKLOG 条目 44 条') >= 0, '★ LF 同内容仍解析 44 条');
 
   /* 缺 STATUS 的 CRLF 样本：--check 必须红，且红的原因是 unknown */
   const lines = lfText.split('\n');

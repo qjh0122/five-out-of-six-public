@@ -1,22 +1,27 @@
 /**
- * 「打满局数结束」= 和「分数见底结束」同一套结算界面（v102 §14.1）
+ * 打满建房时选的把数 → 同一套结算界面、同一批出口（v102 §14.1；v153 校正口径）
  *
  * 用户原话：「打满局数结束的情况应该像有人到达底分结束一样，
  *             统一的逻辑结算，保持一样的界面选择退出或者下一局」
+ * ⚠ v103 起「分数见底」不再终止游戏（负分继续打），所以「两种正常收尾」
+ *   这个 v102 前提已经不成立。现行规则下终局只有 handLimit / someoneLeft /
+ *   dissolve；本探针仍守用户要的那件事：**结算屏与按钮不按原因分叉**，
+ *   并把「打满 N 把，本局结束」与「提前结束」明确区分开。
  *
  * 静态那一半（进结算屏的条件里没有 endReason、按钮不按原因隐藏、文案不空白）
  * 由 pwa/test/handlimit-settle-parity.test.js 锁死。这个探针只管静态测试
  * **永远测不到**的那一半：
  *
- *   1. 3 局房真的会在第 3 把结束时进 #screen-settle（不是第 4 把，也不是永远打下去）
+ *   1. 3 把房真的会在第 3 把结束时进 #screen-settle（不是第 4 把，也不是永远打下去）
  *   2. 那一屏上的「开始下一局 / 离开房间」真的在视口里、真的点得到
  *      （.screen 是 overflow:hidden，多出来的按钮会被静默裁掉 —— 看起来就是「没做」）
- *   3. 点「开始下一局」→ 回准备态 → 再开局，顶栏仍是「1/3 把」（档位真的沿用）
- *   4. 第二局再打满，仍然进同一屏、同一批按钮（不是一次性的）
+ *   3. 点「开始下一局」→ **直接开下一把**（v116 报名即准备，不再回准备态），
+ *      顶栏从「3/3」变「第 1/3 把」（档位真的沿用）
+ *   4. 第二局再收尾，仍然进同一屏、同一批按钮（不是一次性的）
  *
  * ⚠ 为什么这里要「重试」：
- *   3 局房不一定打得到第 3 把 —— **任一玩家分数 ≤0 会提前结束**，而 20 分初始分
- *   只够扛住约一把的极端波动（一把最坏 -17：3 组单轮 + 斗牛五花牛带无牛罚分）。
+ *   3 把房不一定打得到第 3 把 —— 有人离开 / 全员解散会提前结束，而随机牌也不保证
+ *   每局都能收尾得干净（一把最坏 -17：3 组单轮 + 斗牛五花牛带无牛罚分）。
  *   实测 3 人局有近一半的概率在 3 把内爆分。所以本探针固定用 **2 人局**
  *   （每人每组只付一份，方差最小），并在被爆分抢先时重开一个房再试 ——
  *   探针要验的是「打满时界面长什么样」，不能靠运气撞上。
@@ -43,7 +48,7 @@ const SRV_PORT = 3973;
 const CDP_PORT = 9373;
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'lxw-hls-'));
 
-const LIMIT = 3;          // 固定档位（3 局 = 3 把 = 6 轮）
+const LIMIT = 3;          // 固定档位（3 把 = 6 轮）
 const BOTS = 1;           // 2 人局：方差最小，最不容易在打满前爆分
 const ATTEMPTS = 3;       // 被爆分抢先时最多重开几次
 const MAX_ROUNDS = 16;    // 一局最多 6 轮，留足余量
@@ -459,7 +464,7 @@ async function main() {
   /* ------------------------- [2] 建房 → 打到结算页 -------------------------
    * ★ 主断言与「因为什么结束」解耦：用户要的是「两条路落在同一屏」，
    *   所以先拿到任意一局的结算页，把屏和按钮验完整；
-   *   「打满 3 局」那条文案只在**真的撞上**时额外验（下面会如实说明有没有撞上）。
+   *   「打满 3 把」那条文案只在**真的撞上**时额外验（下面会如实说明有没有撞上）。
    *   为什么不能硬要求必须撞上：20 分初始分只够扛 2~3 把的波动，
    *   爆分几乎总会先到 —— 实测 3 次尝试里常有一次都撞不上。
    *   那是数值设定的事，不是界面的事，不该让界面探针为它变红。 */
@@ -486,11 +491,12 @@ async function main() {
     await sleep(800);  // settle-row 错峰淡入
     const sign = await evaluate('__hls.settleSign()');
     if (!sign) continue;
-    const isLimit = /打满 \d+ 局/.test(sign.body);
-    reasons.push(isLimit ? '打满' : '见底');
+    /* v153：v113 把「打满 N 局」统一成「打满 N 把」；v103 起 scoreZero 不再终局。 */
+    const isLimit = /打满 \d+ 把/.test(sign.body);
+    reasons.push(isLimit ? '打满' : '其他终局原因');
     if (!mainSign) mainSign = sign;
     if (isLimit) { limitSign = sign; break; }
-    if (t < ATTEMPTS) console.log('    这一局是「分数见底」收的尾，再开一个房争取撞上「打满」');
+    if (t < ATTEMPTS) console.log('    这一局不是打满收的尾，再开一个房争取撞上「打满」');
   }
 
   ok(!!mainSign, '★ 打到结算页（任意原因）');
@@ -506,8 +512,11 @@ async function main() {
   ok(sign1.onSettle === true, '屏是 #screen-settle（两条结束原因同一个屏）');
   ok(sign1.title === '本局结束', '标题是「本局结束」', sign1.title);
   ok(/净胜 = 最终分/.test(sign1.body), '★ 尾注带净胜公式（两条路同一套文案结构）', sign1.body.slice(-40));
-  ok(/打满 \d+ 局|分数输到底/.test(sign1.body),
-    '★ 结算说明是两种「正常结束」之一（不是空白，也不是「提前结束」）', sign1.body.slice(-60));
+  /* ★ v153 口径校正：v103 删掉「见底出局」，v113 把「局」统一成「把」。
+   * 判据没有放松：必须出现完整的「打满 N 把，本局结束」，且不许出现「提前结束」，
+   * 空白 / someoneLeft / dissolve 都会红。 */
+  ok(/打满 \d+ 把，本局结束/.test(sign1.body) && !/提前结束/.test(sign1.body),
+    '★ 结算说明是正常收尾（「打满 N 把，本局结束」，不是空白/「提前结束」）', sign1.body.slice(-60));
 
   const b1 = sign1.btns || [];
   ok(b1.length === 5 && b1.every((b) => b.exists), '五颗结算按钮都在', JSON.stringify(b1.map((b) => b.id)));
@@ -518,14 +527,14 @@ async function main() {
   const nextBtn = b1.find((b) => b.id === 'btn-next');
   ok(nextBtn && /开始下一局/.test(nextBtn.text), '「开始下一局」文案没变', nextBtn && nextBtn.text);
 
-  const tag = /打满 \d+ 局/.test(sign1.body) ? 'handlimit' : 'scorezero';
+  const tag = /打满 \d+ 把/.test(sign1.body) ? 'handlimit' : 'other-end';
   console.log('    图：' + (await shot('settle-' + tag + '.png')));
 
   if (limitSign) {
-    ok(/打满 \d+ 局，本局结束/.test(limitSign.body),
-      '★ 真撞上「打满」时说明写的是「打满 N 局，本局结束」', limitSign.body.slice(-60));
-    ok(/打满 3 局/.test(limitSign.body),
-      '★ 报的就是建房时选的 ' + LIMIT + ' 局（不是默认 10）', limitSign.body.slice(-60));
+    ok(/打满 \d+ 把，本局结束/.test(limitSign.body),
+      '★ 真撞上「打满」时说明写的是「打满 N 把，本局结束」', limitSign.body.slice(-60));
+    ok(/打满 3 把/.test(limitSign.body),
+      '★ 报的就是建房时选的 ' + LIMIT + ' 把（不是默认 10）', limitSign.body.slice(-60));
     ok(limitSign.btns.every((b) => b.inView) && limitSign.btns.length === 5,
       '★ 打满这一屏的按钮与爆分完全同一套（5 颗、全在视口内）',
       JSON.stringify(limitSign.btns.map((b) => b.id)));
@@ -535,23 +544,22 @@ async function main() {
     console.log('           爆分几乎总会先到。「打满」的分支与文案由 pwa/test/handlimit-settle-parity.test.js 覆盖。');
   }
 
-  /* ------------------------- [3] 续局沿用 3 局 ------------------------- */
-  console.log('\n[3] 点「开始下一局」→ 回准备态 → 再开局，档位必须还是 3');
+  /* ------------------------- [3] 续局沿用 3 把 ------------------------- */
+  console.log('\n[3] 点「开始下一局」→ 直接开下一把，档位必须还是 3');
   await evaluate('document.getElementById("btn-next").click()');
-  ok(await waitFor(READY_DRAWN, 10000, '点开始下一局没回准备态'), '★ 「开始下一局」可用（结算后的出口是通的）');
-  /* 打了几把要看上一局实际停在哪（爆分可能停在 2/3），所以这里只锁「分母还是 3」 */
+  /* ★ v153：v116「报名即准备」把两次点击并成一次 —— 点完 btn-next 直接发牌，
+   * 没有中间准备态。旧判据在等 table-ready，10 秒超时后还去点 btn-ready，
+   * 于是「流程改了、探针没改」被误读成「结算后出口断了」。
+   * 这里改成等**下一把真的开始**，判据强度反而更高：不只看按钮可点。 */
+  const nextStarted = await waitFor(IN_TABLE, 15000, '点了「开始下一局」没直接开下一把');
+  ok(nextStarted, '★ 「开始下一局」可用：点一下就开了下一把（v116 报名即准备）');
   const subWait = await evaluate('__hls.sub()');
-  ok(/已打 \d+\/3 把/.test(String(subWait || '')), '就位态顶栏写着「已打 N/3 把」（分母仍是 3）', subWait);
-
-  await evaluate('document.getElementById("btn-ready").click()');
-  ok(await waitFor(IN_TABLE, 15000, '第二局没开起来'), '★ 第二局开起来了');
-  const sub2 = await evaluate('__hls.sub()');
-  ok(/\b1\/3 把/.test(String(sub2 || '')),
-    '★ 第二局顶栏是「1/3 把」—— 档位沿用建房时的 3，没退回默认 10', sub2);
+  ok(/第 1\/3 把/.test(String(subWait || '')),
+    '★ 新一把顶栏是「第 1/3 把」（分母仍是 3，没退回默认 10）', subWait);
 
   /* ------------------------- [4] 第二局再结算一次 -------------------------
-   * ★ 这里**不能**假设第二局也会打满：初始 20 分在 2 人局里只够扛 2~3 把，
-   *   实测就有一半的第二局被爆分抢先结束。而「被抢先是正常的」这件事本身，
+   * ★ 这里**不能**假设第二局也会打满：2 人局的随机牌可能提前触发别的终局原因。
+   *   而「原因不同也该是同一屏」这件事本身，
    *   正好可以用来验用户诉求的最后一层 —— **两种结束原因必须落在同一屏、
    *   同一批按钮上**。所以这里不再要求原因，只要求「同屏同按钮」，
    *   并如实打印这一次是哪种原因收的尾。 */
@@ -561,10 +569,10 @@ async function main() {
   await sleep(800);
   const sign2 = await evaluate('__hls.settleSign()');
   const body2 = String((sign2 && sign2.body) || '');
-  const byLimit2 = /打满 3 局/.test(body2);
-  const byZero2 = /分数输到底/.test(body2);
-  console.log('    第二局结束原因：' + (byLimit2 ? '打满 3 局' : byZero2 ? '分数见底' : '（未识别）' + body2.slice(-50)));
-  ok(byLimit2 || byZero2, '★ 第二局的结算说明是两种「正常结束」之一（没有空白、没有「提前结束」）',
+  const byLimit2 = /打满 3 把，本局结束/.test(body2);
+  const abnormal2 = /提前结束|有玩家离开/.test(body2);
+  console.log('    第二局结束原因：' + (byLimit2 ? '打满 3 把' : abnormal2 ? '非正常收尾' : '（未识别）' + body2.slice(-50)));
+  ok(byLimit2 && !abnormal2, '★ 第二局仍是正常收尾（打满 3 把，不是空白/「提前结束」）',
     body2.slice(-60));
   const b2 = (sign2 && sign2.btns) || [];
   ok(b1.every((b) => b.inView) && b2.every((b) => b.inView),

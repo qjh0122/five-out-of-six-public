@@ -284,7 +284,141 @@ ok(/setSoundEnabled\s*\(\s*!?\s*Sfx\.isSoundEnabled\(\)/.test(gameJs),
 ok(gameJs.indexOf('背景音乐已') === -1 && gameJs.indexOf('背景音乐（开）') === -1,
   '界面文案里不再出现「背景音乐」字样（说背景音乐，玩家就会以为只管音乐）');
 
-console.log('\n========================================');
-console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
-console.log('========================================');
-if (fail > 0) process.exitCode = 1;
+/* ---------- ★ B2 拒绝路径门禁（v155；从 tools/qa/audio-b2-wiring.js 迁入，随 npm test 跑） ----------
+ * 原来的假 Audio.play() 永远 Promise.resolve()，测不到「首次 play 被拒」——
+ * 全绿也证明不了 B2。这里用可配置拒绝 BGM 的假 Audio + 假 document + 初始
+ * suspended 的假 AudioContext 跑同一份 sfx.js（vm 沙箱，不复制逻辑），逐条验：
+ * 手势内首播 / fulfilled 取消静音 / rejected 挂一次性手势重试 / unlocked 不挡重试 /
+ * 同栈 resume。QA 独立工具 tools/qa/audio-b2-wiring.js 保留，供单独复跑。 */
+function firstPlayBeforeFlush(trace) {
+  const firstPlay = trace.indexOf('bgm:play');
+  const firstFlush = trace.indexOf('flush');
+  if (firstPlay < 0) return false;
+  if (firstFlush < 0) return true;
+  return firstPlay < firstFlush;
+}
+const B2_SELF_CASES = [
+  { t: ['bgm:play', 'flush'], want: true },
+  { t: ['ctx:resume', 'bgm:play', 'flush'], want: true },
+  { t: ['flush', 'bgm:play'], want: false }
+];
+
+function bootB2(opts) {
+  opts = opts || {};
+  const trace = [];
+  const docListeners = { touchstart: [], mousedown: [] };
+  const doc = {
+    addEventListener: function (type, fn) {
+      (docListeners[type] || (docListeners[type] = [])).push(fn);
+    },
+    removeEventListener: function (type, fn) {
+      const arr = docListeners[type] || [];
+      const i = arr.indexOf(fn);
+      if (i >= 0) arr.splice(i, 1);
+    }
+  };
+  const timers = [];
+  let rejectRemaining = opts.rejectBgmFirst || 0;   // 只拒绝 BGM 的前 N 次 play
+  let bgmOrdinal = 0;
+  function FakeAudio(src) {
+    this.src = src; this.loop = false; this.muted = false; this.volume = 1;
+    this.currentTime = 0; this.playbackRate = 1; this.playing = false;
+    const self = this;
+    const isBgm = src.indexOf('bgm') >= 0;
+    this.play = function () {
+      if (isBgm) {
+        bgmOrdinal++;
+        trace.push('bgm:play');
+        if (bgmOrdinal <= rejectRemaining) {
+          trace.push('bgm:reject');
+          return Promise.reject(new Error('NotAllowedError'));
+        }
+      }
+      self.playing = true; trace.push('play:ok');
+      return Promise.resolve();
+    };
+    this.pause = function () { self.playing = false; };
+    this.addEventListener = function () {};
+  }
+  function FakeAC() {
+    this.state = 'suspended'; this.currentTime = 0; this.destination = {};
+    const self = this;
+    this.resume = function () { trace.push('ctx:resume'); self.state = 'running'; return Promise.resolve(); };
+    this.createOscillator = function () {
+      return { type: 'sine', frequency: {
+        setValueAtTime: function () {}, exponentialRampToValueAtTime: function () {}
+      }, connect: function () {}, start: function () { trace.push('osc:start'); }, stop: function () {} };
+    };
+    this.createGain = function () {
+      return { gain: { setValueAtTime: function () {}, exponentialRampToValueAtTime: function () {} },
+        connect: function () {} };
+    };
+  }
+  const sandbox = {
+    Audio: FakeAudio, AudioContext: FakeAC, document: doc,
+    localStorage: makeStore({}), Math: Math, Promise: Promise, console: console,
+    setTimeout: function (fn) { timers.push(fn); return timers.length; },
+    clearTimeout: function () {}
+  };
+  sandbox.self = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(STORAGE_SRC, sandbox, { filename: 'storage.js' });
+  vm.runInContext(SRC, sandbox, { filename: 'sfx.js' });
+  return {
+    Sfx: sandbox.Sfx, trace: trace, docListeners: docListeners,
+    flush: function () { while (timers.length) { trace.push('flush'); timers.shift()(); } },
+    fireGesture: function (type) { (docListeners[type] || []).slice().forEach((fn) => fn()); }
+  };
+}
+function microtaskFlush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
+
+async function b2RejectPathTests() {
+  console.log('\n[★ B2 拒绝路径（随 npm test 执行的门禁）]');
+  // 判定器自验：先证明「首播在 flush 之前」这条判据不是恒真
+  B2_SELF_CASES.forEach(function (c) {
+    ok(firstPlayBeforeFlush(c.t) === c.want,
+      'B2 判定器自验 ' + JSON.stringify(c.t) + ' → ' + c.want);
+  });
+
+  // 成功路径：同步手势栈内首播 + fulfilled 取消静音 + 同栈 resume
+  const good = bootB2({});
+  good.Sfx.unlock();
+  ok(firstPlayBeforeFlush(good.trace),
+    '★ 首次 BGM play 在同步手势栈内（未 flush 定时器就已 play）', good.trace);
+  ok(good.Sfx.diagnostics().bgmMuted === true,
+    '★ 首次 play 时 BGM 仍 muted（Promise 完成前不取消静音）', good.Sfx.diagnostics());
+  await microtaskFlush();
+  ok(good.Sfx.diagnostics().bgmMuted === false, '★ play() fulfilled 后 BGM 取消静音');
+  ok(good.trace.indexOf('ctx:resume') >= 0, '★ 手势栈内 ensureCtx/resume（不是 suspended 首播）');
+
+  // 拒绝路径：首播被拒 → 挂下次手势监听 → 下次手势补播，unlocked 不挡重试
+  const bad = bootB2({ rejectBgmFirst: 1 });
+  bad.Sfx.unlock();
+  await microtaskFlush();
+  ok(bad.docListeners.touchstart.length >= 1 && bad.docListeners.mousedown.length >= 1,
+    '★ 首次 BGM play 被拒后 touchstart + mousedown 重试监听已挂',
+    { ts: bad.docListeners.touchstart.length, md: bad.docListeners.mousedown.length });
+  const d = bad.Sfx.diagnostics();
+  ok(d.retryArmed === true && d.retryCount >= 1, 'diagnostics 报告 retryArmed/retryCount', d);
+  ok(bad.Sfx.isUnlocked() === true, '前提：unlocked 已置位（重试不能被它锁住）');
+  const playsBefore = bad.trace.filter((x) => x === 'bgm:play').length;
+  bad.fireGesture('touchstart');
+  const playsAfter = bad.trace.filter((x) => x === 'bgm:play').length;
+  ok(playsAfter === playsBefore + 1,
+    '★ 下次手势真的补播了 BGM（unlocked 没挡住重试）',
+    { playsBefore, playsAfter, trace: bad.trace });
+}
+
+/* 汇总必须等异步 B2 段跑完再打，否则 run-tests.js 会先读到旧计数（假绿）。 */
+(async function main() {
+  try {
+    await b2RejectPathTests();
+  } catch (e) {
+    fail++;
+    console.log('  FAIL  B2 拒绝路径执行异常 -> ' + (e && e.message));
+  }
+  console.log('\n========================================');
+  console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
+  console.log('========================================');
+  if (fail > 0) process.exitCode = 1;
+})();

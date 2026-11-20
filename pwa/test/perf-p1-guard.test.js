@@ -149,9 +149,19 @@ console.log('\n[A] 页面自检：真函数 + 假 fetch');
   {
     const added = [], puts = [], fetched = [];
     const store = new Map();
-    const put = async (req, res) => { puts.push(typeof req === 'string' ? req : req.url); store.set(req.url || req, res); };
+    const keyOf = (req) => (typeof req === 'string' ? req : (req && req.url) || '');
+    const put = async (req, res) => { puts.push(keyOf(req)); store.set(keyOf(req), res); };
     const cachesStub = {
-      open: async () => ({ put, add: async (u) => { added.push(u); } }),
+      /* C7 的 install 会先 cache.match(同版本键) 再决定是否重新下载，
+       * 桩里必须提供 match，否则测的是「桩缺方法」而不是产品行为。 */
+      open: async () => ({
+        put,
+        match: async (req) => store.get(keyOf(req)),
+        add: async (u) => {
+          added.push(u);
+          store.set(String(u), new Response('precached', { status: 200 }));
+        }
+      }),
       match: async (req) => store.get(req.url || req),
       keys: async () => [], delete: async () => true
     };

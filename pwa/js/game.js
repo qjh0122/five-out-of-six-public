@@ -468,7 +468,10 @@
       box.classList.remove('tick');
       void box.offsetWidth;
       box.classList.add('tick');
-      Sfx.play('select', txt === '开始' ? 1.25 : 1);
+      /* v155：3/2/1 与「开始」从 select 拆成独立事件；
+       * 3/2/1 的固定递升音高是语义（逐拍收紧），不交给随机抖动。 */
+      Sfx.play(txt === '开始' ? 'countdown_go' : 'countdown_tick',
+        txt === '开始' ? 1 : (txt === '3' ? 1 : txt === '2' ? 1.02 : 1.04));
       cd.i += 1;
       cd.timer = setTimeout(step, COUNT_HOLD);
     };
@@ -550,9 +553,11 @@
          *   ② 不认并列 —— 两人同分并列第一时，只有排在前面的那个有声音。
          * 同一个事实两个来源，早晚要分岔；这里改成只留一份。 */
         var _champs = settleRank(room.players).filter(function (r) { return r.champion; });
-        if (_champs.some(function (r) { return r.p.id === state.myId; })) {
-          setTimeout(function () { Sfx.play('win'); }, 500); // 我赢时的庆祝音（P2）
-        }
+        var _iWon = _champs.some(function (r) { return r.p.id === state.myId; });
+        /* v155：冠军号角从 win 拆出来（win 只表示「这一手漂亮」）。
+         * 没夺冠的人给 lose——按**我的名次**选，不按结算幕数选；
+         * settleCelebrated 保证同一结算只响一次。 */
+        setTimeout(function () { Sfx.play(_iWon ? 'champion_fanfare' : 'lose'); }, 500);
       }
       return;
     }
@@ -871,7 +876,11 @@
   function hideSpectator() {
     var sp = $('#spectator');
     if (sp) { sp.classList.add('hidden'); sp.innerHTML = ''; }
+    /* v155：退出旁听给一声中性提示；只在「真的从旁听态离开」时响，
+     * 不是每次 render 都响（showReadyTable 每次重绘都会调这里）。 */
+    if (spectatorAudioOn) { spectatorAudioOn = false; Sfx.play('spectator'); }
   }
+  var spectatorAudioOn = false;
 
   function showReadyTable(room, opts) {
     var nextWait = !!(opts && opts.nextWait);
@@ -1007,6 +1016,7 @@
       /* 不手工重绘：改完服务端会广播，订阅回调把结算页整块重画。
        * 手工再画一遍只会和广播抢，画出两份不一样的按钮状态。 */
       flash('下一局打 ' + n + ' 把');
+      Sfx.play('select', 0.9);   // v155：把数变更复用 select，降一档与选牌区分
     } catch (e) {
       reportBug('setHandLimit', e);
     }
@@ -1062,6 +1072,7 @@
       var sp = $('#spectator');
       if (sp) {
         sp.classList.remove('hidden');
+        if (!spectatorAudioOn) { spectatorAudioOn = true; Sfx.play('spectator'); }
         sp.innerHTML = '';
         sp.appendChild(el('div', 'sp-badge', '旁听中'));
         sp.appendChild(el('h2', 'sp-title', '你不在这一局'));
@@ -1188,6 +1199,15 @@
    *   3. 座位条的原生横向滚动条（灰白粗条）直接隐藏，改右缘渐隐提示可滑。 */
   function renderTopBar(room, me, round, submitted, nextWait) {
     var top = $('#game-top');
+    /* B-L6-b（v155）：旁听时「我的分 0」会被读成「我打了 0 分」。
+     * 只換这一格的文案：旁听态写「旁听中 / —」，正常态逐字不变。
+     * 两条渲染路径（桌面 / 圆桌环）共用这两个变量，避免又一次只改一处。 */
+    var spectating = !!(me && me.benched);
+    var meLabel = spectating ? '旁听中' : '我的分';
+    var meScoreText = spectating ? '—' : me.score;
+    var meTitle = spectating
+      ? ((me.nickname || '我') + ' · 旁听中 · 点看我的战绩')
+      : ((me.nickname || '我') + ' · ' + me.score + ' 分 · 点看我的战绩');
     /* 圆桌座位环（v87）：整块顶栏换成一张桌子。
      * 开关走 seatRingFlag()（CONFIG.SEAT_RING + URL ?seatring=0/1），关掉之后
      * 继续走下面那条 v86 的路径 —— 一个像素都不差，这是回滚的前提。 */
@@ -1264,11 +1284,12 @@
        * 点自己也能看自己的战绩（以前这里没有 data-pid，点上去什么都不会发生，
        * 而点别人却能弹卡 —— 同一屏两套手感）。 */
       + '<div class="gt-me" data-pid="' + esc(me.id) + '"'
-      + ' title="' + esc((me.nickname || '我') + ' · ' + me.score + ' 分 · 点看我的战绩') + '">'
+      + ' title="' + esc(meTitle) + '">'
       + '<div class="opp-avatar is-me">' + avatarInner(me.id, me.avatar, '我', false, me.photo) + '</div>'
       + '<div class="gt-me-body">'
-      + '<span class="gt-me-label">我的分</span>'
-      + '<b class="gt-score">' + me.score + '</b>'
+      + '<span class="gt-me-label">' + meLabel + '</span>'
+      + (spectating ? '<b class="gt-score is-spectator">' : '<b class="gt-score">')
+      + meScoreText + '</b>'
       + '</div>'
       + '</div>'
       + '</div>';
@@ -1358,7 +1379,8 @@
       var scoreEl = top.querySelector('.gt-score');
       if (scoreEl) {
         var prev = state.lastMeScore;
-        if (prev !== null && prev !== me.score) {
+        /* B-L6-b：旁听那一格写的是「—」，分数滚动会把数字又写回去。 */
+        if (!(me && me.benched) && prev !== null && prev !== me.score) {
           animateScore(scoreEl, prev, me.score);
         }
         state.lastMeScore = me.score;
@@ -1706,11 +1728,12 @@
     /* 环下沿的「我」。data-pid 让它和对手座位走同一套点击（点自己也能看战绩） */
     html += '<div class="gt-me" data-pid="' + esc(me.id) + '"'
       + ' style="left:' + g.me.x + 'px;top:' + g.me.y + 'px"'
-      + ' title="' + esc((me.nickname || '我') + ' · ' + me.score + ' 分 · 点看我的战绩') + '">'
+      + ' title="' + esc(meTitle) + '">'
       + '<div class="opp-avatar is-me">' + avatarInner(me.id, me.avatar, '我', false, me.photo) + '</div>'
       + '<div class="gt-me-body">'
-      + '<span class="gt-me-label">我的分</span>'
-      + '<b class="gt-score">' + me.score + '</b>'
+      + '<span class="gt-me-label">' + meLabel + '</span>'
+      + (spectating ? '<b class="gt-score is-spectator">' : '<b class="gt-score">')
+      + meScoreText + '</b>'
       + '</div>'
       + '</div>';
 
@@ -1732,6 +1755,11 @@
    * 也会打断手牌上正在跑的动画。 */
   var splitEndsLocal = 0;    // 已扣掉时钟偏差的截止时刻（本地时间轴）
   var splitTickTimer = null;
+  /* v155：分牌音频去重。同一轮（房号+把数+轮次）每秒最多一记 tick，
+   * 超时只响一次——render 会在任意广播时重跑，不能靠「这次刚好走到这里」去重。 */
+  var splitAudioKey = '';
+  var splitTickSecond = -1;
+  var splitTimeoutFiredKey = '';
 
   function stopSplitTick() {
     if (splitTickTimer) { clearInterval(splitTickTimer); splitTickTimer = null; }
@@ -1744,7 +1772,19 @@
     var left = Math.max(0, Math.ceil((splitEndsLocal - Date.now()) / 1000));
     chip.textContent = left > 0 ? ('剩 ' + left + ' 秒') : '时间到';
     chip.classList.toggle('is-warn', left <= 15);
-    if (left <= 0) stopSplitTick();
+    /* 最后 5 秒逐秒迫近；页面在后台不响（回到前台时按当时的秒数继续）。 */
+    if (left > 0 && left <= 5 && !(typeof document !== 'undefined' && document.hidden)
+      && splitTickSecond !== left) {
+      splitTickSecond = left;
+      Sfx.play('split_tick', 1 + (5 - left) * 0.02);
+    }
+    if (left <= 0) {
+      if (splitTimeoutFiredKey !== splitAudioKey) {
+        splitTimeoutFiredKey = splitAudioKey;
+        Sfx.play('split_timeout');
+      }
+      stopSplitTick();
+    }
   }
 
   function syncSplitTimer(room, locked) {
@@ -1754,6 +1794,12 @@
     if (!chip) return;
     var ends = Number((room && room.splitEndsAt) || 0);
     if (locked || !ends) { chip.classList.add('hidden'); return; }
+    var nextKey = ((room && room.roomId) || '') + ':' + ((room && room.handCount) || '')
+      + ':' + ((room && room.round) || '') + ':' + ends;
+    if (nextKey !== splitAudioKey) {
+      splitAudioKey = nextKey;
+      splitTickSecond = -1;
+    }
     /* 服务端时间 − 本地时间 = 时钟偏差。设备时间被手动改过、或时区设错时，
      * 纯按本地算的倒计时会整体偏掉，甚至一进来就显示「时间到」。 */
     var skew = (Number(room.now) || Date.now()) - Date.now();
@@ -1773,6 +1819,7 @@
    * 为什么不整块重绘：整块重绘会打断正在点的按钮、也会让手牌动画重来。
    * 所以每秒只改这一个 span 的文本，做法与上面的分牌倒计时一致。 */
   var holdTickTimer = null;
+  var holdAudioOn = false;   // v155：挂起状态翻转时才给一声，不是每秒都响
 
   /* settleView 里实现（它同时要渲染那一行），这里只做转发。
    * `Settle` 是 var，在本文件靠后赋值 —— 调用发生在界面初始化之后，
@@ -1802,7 +1849,14 @@
 
   function syncHoldTick(room) {
     stopHoldTick();
-    if (!room || !(StateMachine.holdNextOf && StateMachine.holdNextOf(room))) return;
+    var holding = !!(room && StateMachine.holdNextOf && StateMachine.holdNextOf(room));
+    /* v155（B 级复用）：挂起复用 ready，解除挂起升一档音高。
+     * 广播每秒都会来，必须由状态翻转触发，不能挂在 tick 里。 */
+    if (holding !== holdAudioOn) {
+      holdAudioOn = holding;
+      Sfx.play('ready', holding ? 0.9 : 1.1);
+    }
+    if (!holding) return;
     if (!document.querySelector('.hold-left')) return;
     tickHoldLeft();
     holdTickTimer = setInterval(tickHoldLeft, 1000);
@@ -3379,6 +3433,38 @@
     recordSettled(r);
   }
 
+  /* v155：他人状态音（入房 / 离房 / 提交）统一在订阅回调里做前后快照比对。
+   * 放在 render 里会重复响（广播频率远高于状态变化），放在这里才是「事情发生了」。
+   * 同一秒内最多一记，避免多人同时动作糊成一片；-6 dB 远场在 sfx.js 的 FAR_FIELD。 */
+  var lastSocialSfxAt = 0;
+  function syncSocialAudio(prev, next) {
+    if (!next || !next.players) return;
+    var now = Date.now();
+    if (now - lastSocialSfxAt < 1000) return;
+    var sound = '';
+    if (prev && prev.players) {
+      var before = {}, after = {};
+      var i;
+      for (i = 0; i < prev.players.length; i++) before[prev.players[i].id] = prev.players[i];
+      for (i = 0; i < next.players.length; i++) after[next.players[i].id] = next.players[i];
+      for (i = 0; i < next.players.length; i++) {
+        var p = next.players[i];
+        if (p.id === state.myId) continue;
+        if (!before[p.id]) { sound = 'room_enter'; break; }
+        /* 提交 = 这一轮从「未定稿」变成「定稿」。round 变了不计（那是新一轮）。 */
+        if (prev.round === next.round && !StateMachine.isRoundLocked(before[p.id], prev.round)
+          && StateMachine.isRoundLocked(p, next.round)) { sound = 'peer_submit'; break; }
+      }
+      if (!sound) {
+        for (i = 0; i < prev.players.length; i++) {
+          if (prev.players[i].id === state.myId) continue;
+          if (!after[prev.players[i].id]) { sound = 'room_leave'; break; }
+        }
+      }
+    }
+    if (sound) { lastSocialSfxAt = now; Sfx.play(sound); }
+  }
+
   function attachRoom(roomId, room) {
     cleanupRoom();
     state.roomId = roomId;
@@ -3398,6 +3484,7 @@
           ? ('新的一局已经开始了，你没赶上；这局打完用房号 ' + (state.roomId || '') + ' 还能进')
           : '已退出房间');
       } else {
+        syncSocialAudio(state.room, r);   // 必须在覆盖 state.room 之前拿到旧快照
         state.room = r;
         absorbRoom(r);
         render();
@@ -3606,6 +3693,7 @@
     try {
       var res = await RoomStore.setReady(state.roomId, state.myId, !me.ready);
       if (res && !res.ok) flashRoomError(res);
+      else Sfx.play('ready');   // v155：准备/就位，轻快确认（只有成功才响）
     } catch (e) {
       reportBug('setReady', e);
     } finally {
@@ -3741,6 +3829,7 @@
     var restore = pressBusy(btn, '离开中…');
     if (!restore) return;
     leaveInFlight = true;
+    Sfx.play('room_leave');   // v155：自己离房也有一记轻微下沉，和他人离房同一音色
     /* 房间号 / 座位在发请求前捕获：finish() 里 cleanupRoom() 会清空 state。 */
     var leaveRoomId = state.roomId, leaveMyId = state.myId;
     function finish() {
@@ -3784,7 +3873,9 @@
     hideModalEl('dissolve-modal'); // 投票后先收起弹窗
     var res = await RoomStore.voteDissolve(state.roomId, state.myId, agree);
     if (!res.ok) { flashRoomError(res); return; }
-    Sfx.play('submit');
+    /* v155：否决走 veto（社交性「被挡回」），与规则拦下的 error 分开；
+     * 同意解散仍是 submit——它确实是「确定」。 */
+    Sfx.play(agree ? 'submit' : 'veto');
     render();
   }
 
@@ -4540,7 +4631,7 @@
     renderGuide();
     showModalEl('guide-modal');
     pushModalState();
-    Sfx.play('select');
+    Sfx.play('hint_guide');   // v155：提示/引导出现，柔和云片，不抢 UI 点击音
   }
 
   function closeGuide() {
@@ -4960,6 +5051,12 @@
         return;
       }
       $('#ach-body').innerHTML = AV.pageHtml(pr, window.Ach, { isMe: isMe });
+      /* v155：只有自己的成就数比本次会话上次读到更多时才响一声。 */
+      if (AV.announceUnlock) {
+        var _res = window.Ach && window.Ach.evaluate
+          ? window.Ach.evaluate(pr.ach || null, pr) : null;
+        AV.announceUnlock(_res ? _res.unlocked : 0, isMe);
+      }
       if ($('#ach-scroll')) $('#ach-scroll').scrollTop = 0;
     }).catch(function () {
       if (state.screen !== 'achievements') return;

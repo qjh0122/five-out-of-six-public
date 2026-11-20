@@ -1021,7 +1021,7 @@
     var img = $('#share-img');
     if (img) img.src = url;
     showModalEl('share-modal');
-    Sfx.play('win');
+    Sfx.play('select', 1.12);   // v155：导出战绩图不是胜利，语义从 win 改成 select
   }
 
   /* ---------------------------- 本局过程（回放，P3-7） ----------------------------

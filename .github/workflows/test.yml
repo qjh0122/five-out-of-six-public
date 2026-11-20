@@ -267,6 +267,65 @@ jobs:
           fi
           exit $code
 
+      # ── 首屏第一帧（v153 收编）────────────────────────────────────────
+      # 为什么挂在 journey：它自备静态服务（3047）与 CDP（9379），只跑 390×844
+      # 一个档，14 秒；这一片已经装好浏览器和中文字体。和 motion / undo 一样，
+      # 红的时候单独成一条 check，不与巡检的「布局坏了」混在一起。
+      # 它守的是 boot 之前那一帧：journey 从登录页开始点，ui-flow 从稳定态量，
+      # 两者都看不见「CSS 已应用、JS 还没判登录态」的窗口。
+      - name: 首屏第一帧（无会话 / 有会话 / 存储抛错，390×844）
+        run: |
+          set +e
+          node scripts/probe-ci.js scripts/probe-first-paint.js 390 844 > /tmp/fp.log 2>&1
+          code=$?
+          cat /tmp/fp.log
+          # G1 守卫：只看退出码看不出「12 条断言压根没执行」。三项必须同时在日志里。
+          node -e "
+            const t = require('fs').readFileSync('/tmp/fp.log', 'utf8');
+            const need = ['未登录时', '有会话时', '通过 12 项，失败 0 项'];
+            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
+            if (missing.length) {
+              console.error('::error::首屏探针断言没跑全：' + missing.join(' / '));
+              process.exit(3);
+            }
+          "
+          self=$?
+          if [ $self -ne 0 ]; then exit $self; fi
+          if [ $code -ne 0 ]; then
+            tail -8 /tmp/fp.log | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::$line"
+            done
+          fi
+          exit $code
+
+      # ── 牌型特写（v153 收编）──────────────────────────────────────────
+      # 和首屏探针同片但**串行**：每个探针自带固定端口（3051 / 9361），
+      # 并行会撞端口，症状是「昵称被占用」这种误导性失败。4 秒，忽略不计。
+      # 判据全是几何：类名真的画了、粒子从组中心炸开、横屏半径不裁切。
+      - name: 牌型特写（爆发层 / 粒子 12 枚 / 不裁切，390×844）
+        run: |
+          set +e
+          node scripts/probe-ci.js scripts/probe-big-fx.js 390 844 > /tmp/bfx.log 2>&1
+          code=$?
+          cat /tmp/bfx.log
+          node -e "
+            const t = require('fs').readFileSync('/tmp/bfx.log', 'utf8');
+            const need = ['只有一组带 is-big', '粒子从组中心出发', '通过 21 项，失败 0 项'];
+            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
+            if (missing.length) {
+              console.error('::error::牌型特写探针断言没跑全：' + missing.join(' / '));
+              process.exit(3);
+            }
+          "
+          self=$?
+          if [ $self -ne 0 ]; then exit $self; fi
+          if [ $code -ne 0 ]; then
+            tail -8 /tmp/bfx.log | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::$line"
+            done
+          fi
+          exit $code
+
       # 判定工具自验（AC-NB-26 / N-3）：先证明尺子准，才许拿它量别人。
       # 它同时挡 M8 变异 —— 采集器一旦改成「按文本采集」，这里立刻红并拒绝下结论。
       - name: 几何判定工具自验
