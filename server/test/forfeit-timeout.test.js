@@ -127,7 +127,8 @@ async function run() {
   await a.connect();
   await b.signup();
   await b.connect();
-  ok(true, '两个客户端连接成功');
+  ok(!!a.socket && !!b.socket && a.socket.readyState === 1 && b.socket.readyState === 1,
+    '两个客户端连接成功（socket readyState=1）');
 
   console.log('\n[建房加入准备开局]');
   const created = await a.request('createRoom', { playerId: a.playerId, nickname: a.nickname });

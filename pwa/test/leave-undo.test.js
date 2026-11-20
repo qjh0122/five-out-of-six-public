@@ -339,7 +339,7 @@ head('[AC-NB-15] 不遮挡：不新增节点 / 行高 / 按钮');
   ok(!/el\('button'/.test(tipLine + tipTake), 'AC-NB-15 策略引导不新增按钮');
   ok(!/createElement\('div'/.test(tipLine + tipTake), 'AC-NB-15 策略引导不新增独立容器');
   /* 真浏览器 rect 相交 / checkVisibility 归 CI 探针，本轮不覆盖，不伪报 */
-  ok(true, 'AC-NB-15 几何 rect 相交归 CI 探针（本轮未覆盖，如实留白）');
+  ASSERT.note('AC-NB-15 几何 rect 相交归 CI 探针（本轮未覆盖，如实留白）');
 }
 
 head('[AC-NB-16] 不改变结算数值');

@@ -154,7 +154,7 @@ if (room.phase === 'ROUND2_SPLIT') {
   ok(rr2.ok === true, '第二轮也能改一次', rr2.error);
   eq(pa.resubmits.round2, 1, '第二轮额度用掉');
 } else {
-  ok(true, '本轮直接结账（分数见底），跳过第二轮断言');
+  ASSERT.note('本轮直接结账（分数见底），跳过第二轮断言');
 }
 
 console.log('\n[新一把清空额度]');

@@ -116,7 +116,7 @@ async function main() {
   if (health.body.length < 1024) {
     eq(health.headers['content-encoding'], undefined, '小于 1KB 的 JSON 不压缩（加头反而更大）');
   } else {
-    ok(true, '本次 health 响应已超阈值，跳过该断言');
+    ASSERT.note('本次 health 响应已超阈值（' + health.body.length + 'B），跳过「不压缩」断言');
   }
   ok(String(health.headers['vary'] || '').toLowerCase().indexOf('accept-encoding') >= 0,
     'API 响应也带 Vary（同一 URL 有两种字节形态）');
@@ -146,7 +146,7 @@ async function main() {
         '未压缩时响应必须真的没到 1KB 阈值（实际 ' + full.body.length + 'B）');
     }
   } else {
-    ok(true, '没有备份密钥，跳过全量导出用例');
+    ASSERT.note('没有备份密钥，跳过全量导出用例');
   }
 
   /* ---------------------------------------------------------------- */

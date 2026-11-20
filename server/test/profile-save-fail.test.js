@@ -72,7 +72,7 @@ function eq(a, b, name) {
       seedFile: path.join(TMP, 'no-seed.json'),
       log: function (m) { logs.push(m); }
     });
-    ok(true, '构造 ProfileStore 不抛异常（磁盘坏了也要能起来）');
+    ok(!!bad, '构造 ProfileStore 返回实例且不抛异常（磁盘坏了也要能起来）');
   } catch (e) {
     ok(false, '构造 ProfileStore 不抛异常', e.message);
   }

@@ -161,7 +161,7 @@
 
 ```bash
 npm start                              # 本地起服务，默认 3000 端口
-npm test                               # 全量回归：175 个文件 / 7383 条断言，约 120 秒（含文档一致性守 78 项、P1 守卫 26 项）
+npm test                               # 全量回归：178 个文件 / 7409 条断言，约 128 秒（含文档一致性守 78 项、P1 守卫 26 项、BACKLOG 解析守卫 15 项、恒真断言守卫 5 项、local 补 AI 门槛守卫 9 项）
 npm run docs:check                     # 只跑文档一致性守：死链 / 版本卡片 / 生成式台账 / 现行规格唯一
 node scripts/journey.js                # 真实浏览器走一遍完整用户路径
 node scripts/probe-devices.js --assert # 机型支持：三族 23 档，不达标退出码非 0

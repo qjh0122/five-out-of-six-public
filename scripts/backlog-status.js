@@ -9,6 +9,7 @@
  * 用法：
  *   node scripts/backlog-status.js           打印统计（按 status 分组计数 + 开放清单）
  *   node scripts/backlog-status.js --check   有任何条目缺 STATUS 行就退出码 1（可挂 CI）
+ *   node scripts/backlog-status.js --file X  解析指定文件（守卫用它造负向样本，默认 docs/BACKLOG.md）
  *
  * 口径（写死，别再各自解释）：
  *   open    还要做
@@ -26,7 +27,11 @@ const RE_ITEM = /^### (\S+)\s+(.*)$/;
 const RE_STATUS = /<!--\s*STATUS:\s*(open|closed|record|watch)(?:\s*\|\s*([^>]*?))?\s*-->/;
 
 function parse(text) {
-  const lines = String(text || '').split('\n');
+  /* ★ 行尾归一化：docs/BACKLOG.md 是 1763 行全 CRLF（裸 LF = 0）。
+   * 以前 split('\n') 后每行尾部残留 \r，RE_ITEM 的 `(.*)$` 吃不掉 \r，
+   * 于是 49 条一条都命不中 → unknown=0 → --check 假绿。
+   * split(/\r?\n/) 对 LF / CRLF 两种文件都正确，不能改回 split('\n')。 */
+  const lines = String(text || '').split(/\r?\n/);
   const items = [];
   let cur = null;
   lines.forEach((L, i) => {
@@ -52,7 +57,13 @@ function summarize(items) {
 
 function main() {
   const argv = process.argv.slice(2);
-  const text = fs.readFileSync(FILE, 'utf8');
+  const i = argv.indexOf('--file');
+  const file = i >= 0 ? argv[i + 1] : FILE;
+  if (i >= 0 && !file) {
+    console.error('✗ --file 后面要跟文件路径');
+    process.exit(2);
+  }
+  const text = fs.readFileSync(file, 'utf8');
   const items = parse(text);
   const by = summarize(items);
 

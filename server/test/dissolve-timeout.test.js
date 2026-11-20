@@ -128,7 +128,8 @@ async function run() {
   const b = new Client('乙');
   await a.signup(); await a.connect();
   await b.signup(); await b.connect();
-  ok(true, '两个客户端连接成功');
+  ok(!!a.socket && !!b.socket && a.socket.readyState === 1 && b.socket.readyState === 1,
+    '两个客户端连接成功（socket readyState=1）');
 
   const created = await a.request('createRoom', { playerId: a.playerId, nickname: a.nickname });
   const roomId = created.room.roomId;

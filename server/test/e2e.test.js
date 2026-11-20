@@ -140,7 +140,8 @@ async function run() {
   await b.signup();
 
   await b.connect();
-  ok(true, '两个客户端连接成功');
+  ok(!!a.socket && !!b.socket && a.socket.readyState === 1 && b.socket.readyState === 1,
+    '两个客户端连接成功（socket readyState=1）');
 
   console.log('\n[建房与加入]');
   const created = await a.request('createRoom', { playerId: a.playerId, nickname: a.nickname });
@@ -227,7 +228,7 @@ async function run() {
         eq(p.score - CONFIG.INITIAL_SCORE, sum1[p.id] || 0, (p.nickname || p.id) + ' 净得 == Σ本轮 deltas');
       });
     } else {
-      ok(true, '已进下一把，跳过按轮对账（分数含两轮）');
+      ASSERT.note('已进下一把（' + room.phase + '），跳过按轮对账（分数含两轮）');
     }
 
     ok(typeof room.groupsDone === 'number', 'groupsDone 随房间下发');
@@ -246,7 +247,7 @@ async function run() {
     ok(room.phase === SM.PHASE.SETTLED || room.phase === SM.PHASE.ROUND1_SPLIT,
       '进入结算或自动开下一把', room.phase);
   } else {
-    ok(true, '第一轮即爆分，直接结算（跳过第二轮）');
+    ASSERT.note('第一轮即爆分，直接结算（跳过第二轮断言）');
   }
 
   console.log('\n[结算与档案]');
@@ -262,7 +263,7 @@ async function run() {
     await wait(150);
     room = a.lastRoom();
   } else {
-    ok(true, '已自然结算');
+    ASSERT.note('已自然结算（无需结束本局投票）');
   }
   eq(room.phase, SM.PHASE.SETTLED, '最终进入结算');
   ok(!!room.settledAt, 'settledAt 已下发（前端战绩幂等依赖）');

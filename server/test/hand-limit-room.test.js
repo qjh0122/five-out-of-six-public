@@ -103,7 +103,8 @@ async function run() {
   const b = new Client('乙');
   await a.signup(); await a.connect();
   await b.signup(); await b.connect();
-  ok(true, '两个客户端已鉴权连接');
+  ok(!!a.socket && !!b.socket && a.socket.readyState === 1 && b.socket.readyState === 1,
+    '两个客户端已鉴权连接（socket readyState=1）');
 
   console.log('\n[1] 三档正常值原样落到房间上');
   for (const v of [3, 5, 10, 15, 30]) {

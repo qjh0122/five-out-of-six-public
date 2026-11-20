@@ -224,7 +224,7 @@ console.log('\n[斗牛] 同牛型比大小');
     const c = E.compareDouNiu(jokerHand, normalHand);
     ok(c !== 0, '同为牛牛时能分出胜负（不是张数少就输）', 'compare=' + c);
   } else {
-    ok(true, '构造的无王手不是牛牛，跳过（type=' + cn.type + '）');
+    ASSERT.note('构造的无王手不是牛牛，跳过（type=' + cn.type + '）');
   }
 }
 

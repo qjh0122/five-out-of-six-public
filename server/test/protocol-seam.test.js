@@ -235,9 +235,9 @@ async function run() {
   /* 对手用原始协议进场：要验的缝在**我这一侧**（我的 roomStore → 真服务端），
    * 对手只是把房间凑够两个人。 */
   const mate = await connectRaw(mateAuth.playerId, '缝隙乙', mateAuth.token);
-  await mate.request('joinRoom', { roomId: roomId, playerId: mateAuth.playerId, nickname: '缝隙乙' });
+  const mateJoin = await mate.request('joinRoom', { roomId: roomId, playerId: mateAuth.playerId, nickname: '缝隙乙' });
   await wait(120);
-  ok(true, '对手进场（原始协议）');
+  ok(!!mateJoin && mateJoin.ok !== false, '对手进场（原始协议）→ joinRoom 回包成功', mateJoin);
 
   /* startGame：两人都在但都没准备时应当被明确拒绝，且**不能崩** */
   await call('startGame', RS.startGame(roomId, myId)).then((r) => {

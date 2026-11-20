@@ -151,9 +151,9 @@ async function run() {
   const b2 = new Client('乙');
   b2.playerId = b.playerId; b2.token = b.token;
   await b2.connect();
-  await b2.request('reconnect', { roomId: roomId, token: bSeatToken });
+  const rec = await b2.request('reconnect', { roomId: roomId, token: bSeatToken });
   const reconnectAt = Date.now();
-  ok(true, '乙已重连（距首次进入分牌约 ' + (reconnectAt - t0) + 'ms）');
+  ok(!!rec && rec.ok !== false, '乙已重连（距首次进入分牌约 ' + (reconnectAt - t0) + 'ms）', rec);
 
   /* 补时限之后，下发的剩余时间必须是「补的那个量」，不是原始满额。
    * 这条守的是一个真 bug：_armOneSplitTimer 以前把 Date.now() 记成起点，

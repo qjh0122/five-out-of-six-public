@@ -48,6 +48,17 @@ function log(assertFn, cond, name, extra) {
 }
 
 /**
+ * 跳过留痕（2026-11-20）。只打印 SKIP 到 stdout，**不计数**（pass/fail 全不动）。
+ *
+ * 为什么要有它：以前本该留白的分支写成 ok(true, '本轮未覆盖，如实留白')，
+ * 于是「没测」冒充成「测过且通过」，测试总数被污染。留白必须留痕，但不能计分。
+ * 注意 run-tests.js 的 parseCounts 只认 PASS/FAIL 行与汇总行，SKIP 行天然被忽略。
+ */
+function note(msg) {
+  console.log('  SKIP  ' + frameOf(note) + '  ' + msg);
+}
+
+/**
  * 启动自检（每次 require 跑一次，正常时静默，失败即抛）：
  *   正控一 —— 剥帧生效：harness 内部调用点剥完落在 harness 文件，不在测试目录 ⇒ UNKNOWN。
  *   正控二 —— 帧没被清空：不剥帧时 stack 里能看到本文件，证明 captureStackTrace 真的产出帧。
@@ -66,4 +77,4 @@ function log(assertFn, cond, name, extra) {
   }
 })();
 
-module.exports = { log, frameOf };
+module.exports = { log, frameOf, note };

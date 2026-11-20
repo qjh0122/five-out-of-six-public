@@ -115,7 +115,9 @@ async function run() {
   await a.signup(); await a.connect();
   await b.signup(); await b.connect();
   await c.signup(); await c.connect();
-  ok(true, '三个客户端连接成功');
+  ok(!!a.socket && !!b.socket && !!c.socket
+    && a.socket.readyState === 1 && b.socket.readyState === 1 && c.socket.readyState === 1,
+  '三个客户端连接成功（socket readyState=1）');
 
   console.log('\n[1] 甲乙打完一局（用「结束本局」收口到结算态）');
   const created = await a.request('createRoom', { playerId: a.playerId, nickname: a.nickname });

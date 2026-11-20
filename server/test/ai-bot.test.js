@@ -134,7 +134,7 @@ async function run() {
   console.log('\n[权限校验]');
   let err1 = null;
   try { await me.request('addBot'); } catch (e) { err1 = e.message; }
-  ok(true, '补第三个 AI（共 3 人）不报错或按规则处理');
+  ok(!err1, '补第三个 AI（共 3 人，未满员）不报错', err1);
 
   console.log('\n[开局]');
   await me.request('ready', { ready: true });
@@ -207,7 +207,7 @@ async function run() {
   } else if (myProf.profile) {
     ok(myProf.profile.games === 0, '本局未结算 → 场次仍为 0（场次 ' + myProf.profile.games + '）');
   } else {
-    ok(true, '真人档案尚未产生（本局未结算到 SETTLED）');
+    ok(!myProf.profile && !settledNow, '真人档案尚未产生且本局未结算到 SETTLED（两个条件同时成立）');
   }
   ok(botProf.profile === null, 'AI 不写入人类档案');
 
@@ -223,7 +223,8 @@ async function run() {
   } else if (room && room.phase === SM.PHASE.SETTLED) {
     ok(!err2, '★ 结算期允许补 AI（剩 1 人时的唯一出路）', err2);
   } else {
-    ok(true, '当前仍在等待阶段，跳过该断言');
+    ok(!!room && room.phase === SM.PHASE.WAITING,
+      '当前确实仍在等待阶段（故「对局中/结算期」两条分支都不适用）', room && room.phase);
   }
 
   console.log('\n[非房主不能补 AI]');
