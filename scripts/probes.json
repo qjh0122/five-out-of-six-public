@@ -1,6 +1,6 @@
 {
   "note": "探针台账（v129）。每个 scripts/probe-*.js 必须在这里有一条，否则 pwa/test/probe-ledger.test.js 会红。run 只有三档：ci（每次 push 都跑）/ manual（发版前跑一次）/ oneshot（一次性诊断，保留作复现脚本，不排期）。为什么要有这份清单见 docs/PROBES.md。",
-  "version": "v152",
+  "version": "v153",
   "probes": [
     {
       "file": "probe-ui-flow.js",
@@ -310,6 +310,13 @@
       "why": "admin.html 不参与游戏单测；静态契约只能证明路径存在，证明不了点下去真能跑。这几条都是「代码在、行为不对」，只有真浏览器点得出来",
       "nightlyExempt": "自带服务端实例 + 无头浏览器，单次约 40 秒，且要求本机装了 Chrome/Edge；夜间容器不保证有，改在发版前本机跑",
       "lastVerified": "2026-11-10"
+    },
+    {
+      "file": "probe-perf-once.js",
+      "what": "一次性性能采样：SW 首访/温启动的 FCP/DCL/资源体积、规则弹窗 rAF 帧间隔、JS/CSS/HTML 的 gzip 体积",
+      "run": "oneshot",
+      "why": "2026-11-20 架构审查时的一次性基线采集，只读 pwa/、不改生产代码；温启动带宽这类指标由 CI 的定时采样或发版前手工比对即可，留脚本为了能复现当次现场",
+      "lastVerified": "2026-11-20"
     }
   ]
 }

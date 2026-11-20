@@ -24,6 +24,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
+const VG = require('./lib/version-gate');
 
 const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -63,6 +65,40 @@ head('[0] 分类器自测');
   ok(!!done && !/待施工/.test(done[1]), '能抓到已施工状态，且不误判成待施工', done ? done[1] : 'null');
   ok(/待施工/.test('状态 | **待施工**') && !/待施工/.test('状态 | **已验收（v137）**'),
     '能区分待施工 / 已验收（不是恒真）');
+
+  /* P1-4 门禁的分类器自测：判据必须既能抓也能放，否则「零违规」只是没匹配上。 */
+  eq(VG.parseAppVersion('<meta name="app-version" content="20261120a">'), '20261120a',
+    '能读出 meta app-version');
+  eq(VG.parseAppVersion('<title>没有版本</title>'), null, '没有 meta 时返回 null（不硬猜）');
+  {
+    const good = '<script src="./js/a.js?v=20261120a"></script>'
+      + '<link rel="stylesheet" href="./css/a.css?v=20261120a">';
+    const stale = good.replace('./css/a.css?v=20261120a', './css/a.css?v=20261119b');
+    eq(VG.checkVRefs(good, '20261120a').mismatches.length, 0, '同版本引用 → 放行（不是恒红）');
+    eq(VG.checkVRefs(stale, '20261120a').mismatches.length, 1, '★ 一处 ?v= 落旧版 → 抓到');
+    eq(VG.checkVRefs('<script src="https://cdn/x.js?v=other"></script>', '20261120a').refs.length,
+      0, '外链 CDN 不算本地引用（别误抓）');
+    eq(VG.parseV('/js/a.js?v=20261120a'), '20261120a', '能取出 ?v= 的值');
+  }
+  eq(VG.parseVersionJson('{"v":"20261120a"}'), '20261120a', '能解析 version.json 的 v');
+  eq(VG.parseVersionJson('<html>403</html>'), null, '非 JSON（403 页面）判空，不抛');
+  {
+    const porcelain = ' M pwa/index.html\n?? pwa/js/new.js\n M docs/a.md\n'
+      + 'M  pwa/css/a.css\nR  old.js -> pwa/js/renamed.js';
+    const changed = VG.changedPathsFromPorcelain(porcelain).filter(VG.isSourcePath);
+    eq(changed.length, 4, '★ porcelain 里 4 条源码变更都被认出（含暂存 / 未跟踪 / 改名）');
+    eq(VG.changedPathsFromPorcelain(porcelain).length, 5, 'docs 的变更也被解析，只是不算源码');
+    eq(VG.bumpDecision(true, '20261119b', '20261119b', 'v152', 'v152').fail, true,
+      '★ 源码变了、两个版本都没 bump → 红');
+    eq(VG.bumpDecision(true, '20261120a', '20261119b', 'v152', 'v152').fail, true,
+      '★ 只 bump 一个也不行 → 红');
+    eq(VG.bumpDecision(true, '20261120a', '20261119b', 'v153', 'v152').fail, false,
+      '两个都 bump → 放行（不是恒红）');
+    eq(VG.bumpDecision(false, '20261119b', '20261119b', 'v152', 'v152').fail, false,
+      '源码没变 → 放行');
+    eq(VG.bumpDecision(true, null, null, null, null).fail, false,
+      '缺基线（无 git / 浅仓）→ 跳过而不是误红');
+  }
 }
 
 /* =================== [1] INDEX 死链 =================== */
@@ -222,6 +258,104 @@ head('[6] 快照提醒句不写死当前版本号（否则每发一版它自己�
   ok(row.length > 0, '找得到快照表那一行');
   ok(!row.includes('现在线上是 ' + ver), '★ 提醒句里没有写「现在线上是 ' + ver + '」');
   ok(/现状一律查|唯一权威|见\s*\[?`?release-progress/.test(row), '★ 改为指向唯一权威，而不是复述数字');
+}
+
+/* =================== [7] P1-4 门禁①：本地资源 ?v= =================== */
+head('[7] P1-4 门禁①：本地 script/link 的 ?v= == app-version');
+{
+  const html = read('pwa/index.html');
+  const metaVer = VG.parseAppVersion(html);
+  ok(!!metaVer, '读到了 meta app-version');
+  const r = VG.checkVRefs(html, metaVer);
+  ok(r.refs.length >= 30, '真的扫到了本地资源引用（' + r.refs.length + ' 条）');
+  eq(r.mismatches.length, 0, '★★ 每条本地 script/link 的 ?v= 都等于 app-version',
+    r.mismatches.map((x) => x.url).join(', '));
+
+  /* version.json 是 index.html 的投影，不是第二个真源：漂移必须在这里红 */
+  const vp = 'pwa/version.json';
+  ok(exists(vp), 'pwa/version.json 存在（静态文件，不依赖 server 路由）');
+  if (exists(vp)) {
+    const raw = fs.readFileSync(path.join(ROOT, vp), 'utf8');
+    eq(VG.parseVersionJson(raw), metaVer, '★ version.json 的 v == meta app-version');
+    ok(Buffer.byteLength(raw) < 1024, '★ version.json < 1KB（实测 ' + Buffer.byteLength(raw) + ' B）');
+  }
+}
+
+/* =================== [8] P1-2 接线：轻量端点 + SW 不缓存 =================== */
+head('[8] 版本探针接线：页面走轻量端点，SW 不缓存它');
+{
+  const html = read('pwa/index.html');
+  const sw = read('pwa/sw.js');
+  ok(/fetch\(withSharecode\('\/version\.json'\),\s*\{\s*cache:\s*'no-store'\s*\}\)/.test(html),
+    '★ 自检 fetch /version.json：拼 sharecode + cache:no-store');
+  ok(!/fetch\(withSharecode\('\/index\.html'\)/.test(html),
+    '★ 负向：不再每次抓 index.html 全文（温启动原为 92,586B）');
+  ok(/r\.json\(\)/.test(html) && /data\.v/.test(html), '解析 JSON 的 v，而不是正则扫 HTML');
+  ok(/setInterval\(checkVersionConsistency,\s*90000\)/.test(html), '★ 90 秒轮询保留');
+  ok(/VERSION_RELOADED/.test(html), 'sessionStorage 防重复 reload 保留');
+
+  const at = sw.indexOf("url.pathname === '/version.json'");
+  ok(at > 0, 'SW 里有 /version.json 专属分支');
+  if (at > 0) {
+    const end = sw.indexOf('return;', at);
+    const block = sw.slice(at, end > at ? end : at + 300);
+    ok(/event\.respondWith\(fetch\(req\)\)/.test(block), '★ 分支里直接 fetch(req)（纯网络）');
+    ok(!/caches\./.test(block), '★ 负向：分支不读 / 不写缓存');
+  }
+  /* 与 sw-precache.test.js 同一套解析：先剥注释，再取单引号条目 */
+  const pm = /const PRECACHE = \[([\s\S]*?)\];/.exec(sw);
+  ok(!!pm, '能解析 PRECACHE 清单');
+  if (pm) {
+    const body = pm[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    ok(!/'\/version\.json'/.test(body), '★ version.json 不进 PRECACHE（否则版本号被冻住）');
+  }
+}
+
+/* =================== [9] P1-4 门禁②：源码变更必须 bump =================== */
+head('[9] P1-4 门禁②：源码变更 ⇒ 版本真源同步 bump');
+{
+  const git = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+  const inRepo = git(['rev-parse', '--is-inside-work-tree']);
+  const hasHead = git(['rev-parse', '--verify', 'HEAD']);
+  if (inRepo.status !== 0 || !/true/.test(inRepo.stdout || '') || hasHead.status !== 0) {
+    ok(true, '无 git / 无 HEAD：跳过 bump 门禁（不误红）');
+  } else {
+    const html = read('pwa/index.html');
+    const sw = read('pwa/sw.js');
+    const curApp = VG.parseAppVersion(html);
+    const curCache = VG.parseCacheName(sw);
+    const dirty = git(['status', '--porcelain=v1', '--untracked-files=all', '--',
+      'pwa/js', 'pwa/css', 'pwa/index.html']);
+    const changedDirty = VG.changedPathsFromPorcelain(dirty.stdout || '').filter(VG.isSourcePath);
+
+    let changed = changedDirty, baseRef = 'HEAD';
+    if (!changed.length) {
+      /* 干净工作区：改看「本次提交」（HEAD vs HEAD~1）。浅仓没父提交就跳过。 */
+      const parent = git(['rev-parse', '--verify', 'HEAD~1']);
+      if (parent.status !== 0) {
+        ok(true, '干净工作区且无 HEAD~1（浅仓）：跳过提交分支（不误红）');
+      } else {
+        baseRef = 'HEAD~1';
+        const diff = git(['diff', '--name-only', 'HEAD~1', 'HEAD', '--',
+          'pwa/js', 'pwa/css', 'pwa/index.html']);
+        changed = VG.changedPathsFromDiff(diff.stdout || '').filter(VG.isSourcePath);
+      }
+    }
+
+    if (!changed.length) {
+      ok(true, '工作区与最新提交都没有前端源码变更，跳过 bump 门禁');
+    } else {
+      const oldHtml = git(['show', baseRef + ':pwa/index.html']);
+      const oldSw = git(['show', baseRef + ':pwa/sw.js']);
+      const d = VG.bumpDecision(true, curApp, VG.parseAppVersion(oldHtml.stdout),
+        curCache, VG.parseCacheName(oldSw.stdout));
+      const scope = changedDirty.length ? '工作区' : '本次提交';
+      ok(changed.length >= 1, scope + '检测到源码变更（' + changed.length + ' 个文件）');
+      ok(!!d.appBumped, '★ ' + scope + '的 app-version 已 bump', curApp + ' vs 基线');
+      ok(!!d.cacheBumped, '★ ' + scope + '的 SW CACHE_NAME 已 bump', curCache + ' vs 基线');
+      ok(!d.fail, '★★ bump 门禁通过：' + d.reason, d.reason);
+    }
+  }
 }
 
 console.log('\n通过 ' + pass + ' 项，失败 ' + fail + ' 项');

@@ -6,6 +6,7 @@
  *  - 脚本/样式（/js/* /css/*）：**cache-first，只认 URL 全等**
  *    （`?v=` 就是 app-version，是内容指纹；同版本第二次打开一条请求都不发）
  *  - 静态资源（/icons/* /assets/* /manifest.webmanifest）：cache-first（不常变、省流量）
+ *  - /version.json：纯网络、不缓存、不预缓存（版本自检的真源，必须是服务器当前值）
  *  - /ws（WebSocket）与 /api：不拦截（联机必须在线）
  *
  * 两类 cache-first 的差别只在匹配方式：脚本/样式要求 URL **全等**（多一个 `?v=`
@@ -14,7 +15,7 @@
  *
  * CACHE_NAME 每次发布 bump（v1→v2→…），activate 时清理旧缓存。
  */
-const CACHE_NAME = 'weile-liuxuanwu-v152';
+const CACHE_NAME = 'weile-liuxuanwu-v153';
 
 /* network-first 的超时上限。
  *
@@ -93,6 +94,9 @@ function withShare(u) {
   return u + (u.indexOf('?') >= 0 ? '&' : '?') + SHARE_QUERY.slice(1);
 }
 
+/* /version.json **故意不在 PRECACHE 里**：它是版本自检的真源，
+ * 预缓存 = 把上线那一刻的版本号冻在客户端，此后自检永远报「一致」。
+ * 它在 fetch 事件里单独走纯网络分支（见下方）。 */
 const PRECACHE = [
   '/',
   '/index.html',
@@ -322,6 +326,15 @@ self.addEventListener('fetch', function (event) {
   if (url.origin !== self.location.origin) return;
   // WebSocket / REST 不走 SW（本游戏无 REST，联机必须在线）
   if (url.pathname.startsWith('/ws') || url.pathname.startsWith('/api')) return;
+
+  /* 版本探针：纯网络，既不读缓存也不写缓存。
+   * 它必须每次回答「服务器现在是哪一版」—— cache-first 会把旧版冻住，
+   * network-first 的超时兜底会在弱网时用旧版冒充新版，两者都让自检失去意义。
+   * 断网就让它失败，页面的 catch 会跳过检查（保留 403 / 离线兜底语义）。 */
+  if (url.pathname === '/version.json') {
+    event.respondWith(fetch(req));
+    return;
+  }
 
   const isJsCss = /^\/(js|css)\//.test(url.pathname);
   const isCacheFirst = /^\/(icons|assets)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest';

@@ -37,7 +37,7 @@
 
 | 项 | 现在的值 | 怎么复算 |
 |---|---|---|
-| 线上版本 | `20261119b` / sw `v152` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
+| 线上版本 | `20261120a` / sw `v153` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
 | 线上核对 | **15/15 通过**（2026-11-11 指定头像版 `20261111c` 发布后实跑；版本号回读 = `20261111c`，无 JS 异常 / 无 console.error / 无 HTTP≥400 / SW 已接管 / installability 0 错） | `node scripts/probe-online-smoke.js <url>` |
 | 指定头像 | **5 人**（playerId → 文件名见 `pwa/js/avatar.js` 的 CUSTOM 表；仓库里不写昵称）。`pwa/assets/avatar-custom/` 下 5 张 128×128 webp，线上逐个 200 `image/webp`、体积与本地一致；映射键是 playerId 不是昵称。其余玩家仍走 48 款预设 | `curl -o /dev/null -w '%{http_code} %{size_download}' "<url>/assets/avatar-custom/will.webp?sharecode=<sc>"` |
 | 牌堆 | **54 张**（52 真牌 + 大王 + 小王）。小王 2026-11-12 加入，rank 14.5；两张王功能完全一样（都万能），只有「该比王的地方」大王才压小王 | `node -e "console.log(require('./pwa/js/card.js').createDeck().length)"` |
@@ -45,8 +45,8 @@
 | 成就事件日志 | **已启用**：`/api/backup/events` 回 `ok:true`；18 份档案全部冻上基线，时刻**同一个** `2026-11-11T13:20:03Z`，`20261111b` 重启后**未移动**（第一版漏了排队落盘，见十二） | `curl -H 'x-backup-key: <key>' "<url>/api/backup/events?since=0&sharecode=<sc>"` |
 | r9/r10/r12 历史错数 | **已清零且仍是 0**（9 份档案 / 27 格 + 基线 27 格；`20261111b` 发布后预演回读 `cells: 0`、`baseCells: 0`）。原值：全操 235 场却 `r12=777`、`r10=234`、`r9=271`；最大一档 `r12=801` | `npm run ach:reset -- --keys r9,r10,r12`（预演，应回 0 格） |
 | 管理后台 | 线上 `/admin.html` 可用（三页签：用户管理 / 模拟对战 / 排行榜）；真浏览器登录 **12/12**，错误密钥反向 **8 条全红**。密钥取自 `server/backup-key.txt`（gitignore，未入库），旧值备份在本机 `.workbuddy/` | `curl -H 'x-backup-key: <key>' "<url>/api/admin/users?sharecode=<sc>"` |
-| 全量回归 | **174 文件 / 7321 断言 / 0 失败**（含 `doc-consistency.test.js` 43 项、`deep` 由本轮 UI 一致性整改带来：新增 `ui-copy-consistency` 74、`interaction-consistency` 40、`button-busy-wiring` 16 三个守卫文件，`design-tokens` 27→59、`number-scale` 48→67）。较 v151 的 7140，整改共 +181 条守卫断言 | `npm test` |
-| 探针台账 | **42 条**（`ci` 5 / `manual` 18 / `oneshot` 19） | `npm run probes:check`；真源 `scripts/probes.json` |
+| 全量回归 | **175 文件 / 7383 断言 / 0 失败**（含 `doc-consistency.test.js` 78 项、`perf-p1-guard.test.js` 26 项）。较 v152 的 174 / 7321 净增 1 文件 / 62 断言：P1-4 加两条门禁（资源 `?v=` 真源对账 + 源码变更必须同步 bump），P1-2 加轻量端点与 SW 不缓存的行为守卫；v152 的 UI 一致性整改明细见历史段 | `npm test` |
+| 探针台账 | **44 条**（`ci` 5 / `manual` 19 / `oneshot` 20；本轮把 QA 遗留的 `probe-perf-once.js` 按 oneshot 登记，否则 `probe-ledger.test.js` 会红） | `npm run probes:check`；真源 `scripts/probes.json` |
 | 几何判定工具自验 | **10/10**（6 组已知答案样本 + 2 个采集器合规），M8 变异下退出码 1 | `npm run qa:geom` |
 | CSS 规模 | 6888 行（style 5645 / records 1243） | `wc -l pwa/css/style.css pwa/css/records.css` |
 | B3 进度 | v136 撤销 · v137 四态/错误分级 · v138 数字阶梯 · v139 离开撤销三屏锚点 / 320 策略行 / 工具自验；**仍欠真人试玩**（`BACKLOG.md` N-4） | [`PLAN.md`](./PLAN.md) §P8 |

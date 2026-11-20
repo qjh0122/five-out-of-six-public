@@ -2,7 +2,7 @@
 
 本目录是**质量域（QA）的验收工具**，全部满足三条硬要求：
 
-1. **不联网、不占端口、不启浏览器**（除 `emoji-run-tier.js` 会调用探针，它是唯一会跑批的）；
+1. **不联网、不占端口、不启浏览器**（两条例外：`emoji-run-tier.js` 会调用探针跑批；`version-endpoint-server-count.js` 启本地静态服务 + headless Edge，因为要验的是「SW 是否真的向服务器发请求」，CDP 事件会被 Cache API 应答伪造，只能靠服务器侧出口计数）；
 2. **可独立运行**：`node tools/qa/<name>.js`，不依赖临时目录、不依赖上一轮残留；
 3. **自带自验**：每个工具都有 `--selftest` 或默认自验，且自验里**至少 1 个必命中、1 个必不命中**样本。
    不报数的「已验证正确」不算数。
@@ -21,6 +21,7 @@
 | `emoji-tier-status.js` | **从产物反推档状态**（不采信任何人的标签）：`OK / NOT-RUN / RUNNING / STALE / STALE-IMPL / HALF / MISSING / FAIL-ASSERT / FAIL-EXIT / FAIL-SEAT / COUNT`，检查六档探针是否同源，告警「未登记的档标记」 | `node tools/qa/emoji-tier-status.js [--dir tools/qa/out] [--expect 20] [档…]` / `--selftest` | **33/33**（十一态各一条 + 原因码 9 条（含 4 条现行写法）+ 宽容留痕并排断言 + 「现行写法 marker 状态对**且**原因码读得出」分离断言 + stray 正反两条 + 真样本 1 条 + 漂移哨 3 条）。⚠️ 两条不能省的：**`exit=1` 判 `FAIL-ASSERT`**（跑完且判红，去修实现）与 **`exit=4/5/7` 判 `FAIL-EXIT`**（没跑完，去修工具）必须分开；**`STALE-IMPL`** 比 `meta.finished` 与实现文件 mtime —— **探针 sha 一样但实现变了，只有这条能抓到**（2026-11-14 实况：v2.7 改了 `seatSheetView.js`，六份 meta 的 `probeSha256_16` 一模一样） |
 | `players-fixture.json` | **独立昵称 oracle**（来自座位 fixture 配置，不是实现输出）：`me → 我` + 4 个陪练 | `--players tools/qa/players-fixture.json` | — |
 | `geometry-selftest.js` | 几何断言工具的自验集（历史遗留） | `node tools/qa/geometry-selftest.js` | 见文件内 |
+| `version-endpoint-server-count.js` | **`/version.json` 轻量端点正确性（服务器侧计数）**：真 Edge + 真 SW 接管后重复打开 N 次，判服务器每次收到恰好 1 条 `/version.json`（温启动不静默跳过）；内存改 `v` 判页面 reload 且拿到最新值；负向查 SW Cache API 无 `version.json` 条目。⚠️ **本工具破例：占端口 3097 / CDP 9397 + 启 headless Edge** —— 因为疑点正是「SW 用 Cache API 应答也会发 CDP Network 事件」，只能用真浏览器 + 服务器侧出口计数复算，无法纯静态判定。不写生产代码：`version.json` 只在内存替换 `v`，磁盘 SHA 前后比对 | `node tools/qa/version-endpoint-server-count.js`（退出码 0=三问全真） | **10/10**（路径分类 6 + 版本比较 4，含 3 命中 / 7 不命中） |
 
 ## 跑批标准流程
 

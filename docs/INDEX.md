@@ -43,7 +43,7 @@
 | [`build-next-batch-v1.md`](./build-next-batch-v1.md) | **本批施工单**（制作人裁定，冲突时以此为准）：R1–R18 逐条裁定 + 11 行文件级改动清单 + 跳过/占位。**R17 记着「三条分屏 CSS 规则从未匹配」这条作用域错配** | 2026-11-09 / 已施工 · ①已撤 |
 | [`leave-direct-change.md`](./leave-direct-change.md) | **改动说明**（主程序）：2026-11-18「离开房间改直接退」的实现方案、移除符号清单、共享代码保留判断、验证数字 | 2026-11-18 / 已交付 |
 | [`qa-leave-direct.md`](./qa-leave-direct.md) | **QA 独立验收报告**（严过关）：10 条判据逐条四态、真浏览器冷启动实测、连点闸变异自证红→绿原始输出、工作区 SHA-256 还原证明。结论**通过** | 2026-11-18 / 通过 |
-| [`PROBES.md`](./PROBES.md) | 探针台账：43 个探针各守什么、归谁管（`ci` 5 / `manual` 19 / `oneshot` 19；其中 42 个是真浏览器探针，1 个是纯 Node 的落点判定尺子自验）、最近一次确认绿是什么时候。**生成式**，真源 `scripts/probes.json` + 生成器 `scripts/probes.js` | 2026-11-09 / v139 |
+| [`PROBES.md`](./PROBES.md) | 探针台账：44 个探针各守什么、归谁管（`ci` 5 / `manual` 19 / `oneshot` 20；其中 43 个是真浏览器探针，1 个是纯 Node 的落点判定尺子自验）、最近一次确认绿是什么时候。**生成式**，真源 `scripts/probes.json` + 生成器 `scripts/probes.js` | 2026-11-09 / v139 |
 | [`release-progress.md`](./release-progress.md) | 每次发布的完整记录：版本号、改动清单、验收数字。**版本现状的唯一权威** | 2026-11-08 / v138 |
 | [`compat.md`](./compat.md) | 兼容性矩阵与降级说明：哪些现代 CSS 特性丢了会怎样、老内核能用到什么程度。**v106 时的实测**，v138 未重跑；要现状就跑对应探针 | 2026-11-01 / v106 |
 | [`device-support.md`](./device-support.md) | 机型支持矩阵。「支持」的四条硬指标（组槽不溢出 / 牌面 ≥39 CSS px / 表情入口 ≥44 / 昵称 ≥10.4），三族 23 档实测。**v105 时的实测**，v138 只复跑了 6 档 `probe-ui-flow`（ALL PASS） | 2026-11-01 / v105 |
@@ -117,10 +117,10 @@
 | [`prototypes/circle-table.html`](./prototypes/circle-table.html) | 圆桌原型（单文件，450K）。是设计稿的权威出处，**不是线上代码** |
 | [`../scripts/`](../scripts/) | 脚本目录：探针 / 模拟 / 构建 / 审计。**条数不在此复述**（以 `ls scripts/*.js \| wc -l` 为准）—— 这里曾写死「62 个」，本轮新增 `check-docs.js` 就把它击穿了，正是 D11 的老毛病。探针清单查 [`PROBES.md`](./PROBES.md) |
 | [`../.github/workflows/test.yml`](../.github/workflows/test.yml) | CI：语法检查 → 全量测试 → `journey` 端到端旅途 → `probe-states` / `probe-undo` / `probe-motion` / 「数字阶梯」两档各一行真执行。**生成式一致性由 `pwa/test/probe-ledger.test.js` 在 `npm test` 内校验**（核 PROBES.md == 台账渲染、ci 登记真的在 workflow 里）；`npm run probes:check` 是手动流入口，不是 CI 那一步（QA 审计 D18） |
-| [`../scripts/probes.json`](../scripts/probes.json) | **探针台账真源**：41 条、`version: v138`。改台账改这里，再 `npm run probes:doc` 重生成 `PROBES.md`（产物禁止手改） |
+| [`../scripts/probes.json`](../scripts/probes.json) | **探针台账真源**：条数与 `version` **不在此复述**（曾写死 41 条 / v138 而真源已变，见 `docs:check` 的对账）。改台账改这里，再 `npm run probes:doc` 重生成 `PROBES.md`（产物禁止手改） |
 | [`../COMMITS.md`](../COMMITS.md) | 提交信息规范（这个仓库曾经 14 条里 11 条叫 `update`）。**规范类，不含版本事实**，所以不放在「现行文档」表 |
 | [`../NOTICE.md`](../NOTICE.md) / [`../SECURITY.md`](../SECURITY.md) | 第三方声明 / 安全披露流程。**规范类，不含版本事实** |
-| [`../scripts/check-docs.js`](../scripts/check-docs.js) | **文档一致性守**：`npm run docs:check` 单跑；`pwa/test/doc-consistency.test.js` 是薄包装，让它进 `npm test` 的执行链（43 项真实计入总断言）。判据：死链 / review 档案登记 / 当前状态卡片与代码版本 / 生成式台账与真源 / 复述计数锚定 / 现行规格唯一 / 状态头已推进 / **[2b] README 的牌堆张数 == `createDeck().length`**（2026-11-18 加，两次变异已自证：54→53 与「52+大王+小王」→「52+大王」均 `EXIT=1`） |
+| [`../scripts/check-docs.js`](../scripts/check-docs.js) | **文档一致性守**：`npm run docs:check` 单跑；`pwa/test/doc-consistency.test.js` 是薄包装，让它进 `npm test` 的执行链（78 项真实计入总断言）。判据：死链 / review 档案登记 / 当前状态卡片与代码版本 / 生成式台账与真源 / 复述计数锚定 / 现行规格唯一 / 状态头已推进 / **[2b] README 的牌堆张数 == `createDeck().length`**（2026-11-18 加，两次变异已自证：54→53 与「52+大王+小王」→「52+大王」均 `EXIT=1`）；P1-4 再加 **[7]** 本地 `?v=` 与 `version.json` 对账、**[9]** 源码变更必须同时 bump app-version / CACHE_NAME（判据在 `scripts/lib/version-gate.js`） |
 
 ---
 

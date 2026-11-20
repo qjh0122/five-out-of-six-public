@@ -84,9 +84,12 @@ ok(/function apiQuery\(/.test(gameJs), '存在 apiQuery 辅助函数');
 // 榜单只给 top50，必须把自己的 id 带上去，否则 51 名开外看不见自己
 ok(gameJs.indexOf('apiQuery({ me: state.myId })') >= 0, '排行榜请求带上自己的 playerId（查「我的排名」用）');
 
-const htmlHasSharecode = /withSharecode\(\s*['"]\/index\.html/.test(html);
+/* P1-2：版本自检已从「抓 index.html 全文」改成「抓 version.json」，
+ * 但网关仍要求 sharecode —— 判据跟着端点走，别让旧字符串把新实现误判成红。 */
+const htmlHasSharecode = /withSharecode\(\s*['"]\/version\.json/.test(html);
 ok(htmlHasSharecode, '版本自检 fetch 带 sharecode（否则会静默失败）');
-ok(!/fetch\(\s*['"]\/index\.html['"]/.test(html), '没有裸的 /index.html fetch');
+ok(!/fetch\(\s*['"]\/version\.json['"]/.test(html), '没有裸的 /version.json fetch');
+ok(!/withSharecode\(\s*['"]\/index\.html/.test(html), '★ 负向：版本自检不再抓 index.html 全文');
 
 console.log('\n[解散弹窗元素]');
 ['dissolve-modal', 'dissolve-title', 'dissolve-desc', 'btn-dissolve-agree', 'btn-dissolve-reject'].forEach(function (id) {
