@@ -1699,6 +1699,17 @@
   }
 
   function ringTopHtml(room, me, round, nextWait, g) {
+    /* ★ 回归修复（v155）：B-L6-b 把「我的分」文案改成旁听感知时，这四个变量
+     * 只定义在 renderTopBar 的作用域里，而本函数是独立作用域 —— 圆桌路径一进来
+     * 就 ReferenceError: meTitle is not defined，导致 render() 抛错、房间号停在
+     * ------、座位全空。JS 函数作用域不穿透，这里必须用传入的 me 自己算一遍。 */
+    var spectating = !!(me && me.benched);
+    var meLabel = spectating ? '旁听中' : '我的分';
+    var meScoreText = spectating ? '—' : me.score;
+    var meTitle = spectating
+      ? ((me.nickname || '我') + ' · 旁听中 · 点看我的战绩')
+      : ((me.nickname || '我') + ' · ' + me.score + ' 分 · 点看我的战绩');
+
     var html = '<div class="gt-felt" style="left:' + g.felt.x + 'px;top:' + g.felt.y
       + 'px;width:' + g.felt.w + 'px;height:' + g.felt.h + 'px"></div>';
 

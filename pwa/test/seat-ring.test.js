@@ -525,5 +525,26 @@ console.log('\n[9] 2 人局对战条（单挑才画）');
   ok(/\.gt-vs \{/.test(css) && /\.gt-vs \.vs-mid/.test(css), 'CSS 有 .gt-vs 与它的中段');
 }
 
+/* ★ 回归守卫（v155 房间页白屏事故）：B-L6-b 把「我的分」改成旁听感知时，
+ * meTitle/meLabel/meScoreText/spectating 只定义在 renderTopBar 作用域，ringTopHtml
+ * 却直接用了它们。JS 函数作用域不穿透 → 圆桌路径 ReferenceError → render() 中断 →
+ * 房间号停在 ------、座位全空（用户实际截图）。纯源码级检查：函数体必须自带定义。 */
+{
+  const gjAll = readGameAll();
+  const m = gjAll.match(/function ringTopHtml\([^)]*\)\s*\{[\s\S]*?\n  \}/);
+  ok(!!m, '能定位 ringTopHtml 函数体（提取失败即守卫失效）');
+  if (m) {
+    const body = m[0];
+    ok(/var spectating\s*=/.test(body), '★ ringTopHtml 自己定义 spectating（不靠 renderTopBar 作用域）');
+    ok(/var meLabel\s*=/.test(body), '★ ringTopHtml 自己定义 meLabel');
+    ok(/var meScoreText\s*=/.test(body), '★ ringTopHtml 自己定义 meScoreText');
+    ok(/var meTitle\s*=/.test(body), '★ ringTopHtml 自己定义 meTitle（缺这条就是白屏回归）');
+    const defAt = body.indexOf('var meTitle');
+    const useAt = body.indexOf('esc(meTitle)');
+    ok(defAt >= 0 && useAt > defAt, 'meTitle 定义在使用之前',
+      'def@' + defAt + ' use@' + useAt);
+  }
+}
+
 console.log('\n通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exit(fail ? 1 : 0);
