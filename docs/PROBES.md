@@ -3,7 +3,7 @@
 > **这份文件是生成的，不要手改。** 真源是 [`scripts/probes.json`](../scripts/probes.json)，
 > 改完跑 `node scripts/probes.js --write` 重生成；`npm test` 会校验两边是否一致。
 >
-> 生成于版本 `v156`，共 44 个探针。
+> 生成于版本 `v159`，共 44 个探针。
 
 ## 为什么不是「全部塞进 CI」
 
