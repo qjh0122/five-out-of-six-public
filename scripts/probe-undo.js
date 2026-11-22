@@ -210,6 +210,28 @@ async function main() {
   console.log('视口 ' + W + '×' + H);
 
 
+  /* 纯几何采集器：只取矩形，**不碰文本**。
+   * tools/qa/geometry-selftest.js 会把它当「尺子」逐条审：必须含
+   * querySelectorAll + getBoundingClientRect，不许出现 ownText / NUM.test / textContent ——
+   * 按文本分类的采集器看不见「框溢出但被 overflow:hidden 裁掉」这类盲区，
+   * 拿它量出来的绿只说明它没看见，不能说明没问题。
+   * 本段几何原先内联在 readState 里（那一份同时读撤销条文案），自验工具找不到尺子
+   * 就一直拒绝下结论。拆出来之后尺子有名有姓，且 readState 直接从它取数，不留第二份。 */
+  const GEO = (sels) => `(function(){
+    var SELS = ${JSON.stringify(sels)};
+    var out = { rects: {} };
+    function rect(el){
+      if (!el) return null;
+      var b = el.getBoundingClientRect();
+      return { t: Math.round(b.top), b: Math.round(b.bottom), l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) };
+    }
+    for (var i = 0; i < SELS.length; i++) {
+      var els = document.querySelectorAll(SELS[i]);
+      out.rects[SELS[i]] = els.length ? rect(els[0]) : null;
+    }
+    return out;
+  })()`;
+
   const readState = `(function(){
     var bar = document.getElementById('undo-bar');
     var msg = document.getElementById('undo-msg');
@@ -221,8 +243,9 @@ async function main() {
     var back = document.getElementById('btn-records-back');
     var store = [];
     try { store = JSON.parse(localStorage.getItem('lxw_records_v1') || '[]'); } catch (e) { store = []; }
-    function r(el){ if(!el) return null; var b = el.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom), l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) }; }
-    var br = r(bar), kr = r(back);
+    /* 几何一律走模块级的 GEO 那把尺子，本段不再自己量一遍 */
+    var G = ${GEO(['#undo-bar', '#btn-records-back', '#undo-act'])};
+    var br = G.rects['#undo-bar'], kr = G.rects['#btn-records-back'];
     var overlap = 0;
     if (br && kr) {
       var ix = Math.max(0, Math.min(br.r, kr.r) - Math.max(br.l, kr.l));
@@ -233,7 +256,7 @@ async function main() {
       barShown: !!bar && !bar.classList.contains('hidden'),
       msg: msg ? msg.textContent : null,
       actText: act ? act.textContent : null,
-      actRect: r(act),
+      actRect: G.rects['#undo-act'],
       barRect: br,
       backOverlap: overlap,
       rows: rows,
@@ -256,7 +279,10 @@ async function main() {
   await sleep(300);
   st = await evaluate(readState);
   ok(st.barShown === true, '★★ 条子弹出来了', JSON.stringify(st));
-  ok(/将清除 2 场/.test(st.msg || ''), '★★ 文案说清了「将清除几场」（不是一句模糊的"已清除"）', st.msg);
+  /* 量词契约：recordsView.js 的清除确认文案是「将清除 N 局战绩」（第 1875 行），
+   * 与 ai-note 那行同一套口径（局 = 一整场对局，三处都写「局」）。
+   * 这里原先写「N 场」，UI 收口到「局」之后这条就一直假红。 */
+  ok(/将清除 2 局/.test(st.msg || ''), '★★ 文案说清了「将清除几局」（不是一句模糊的"已清除"）', st.msg);
   ok((st.actText || '').trim() === '撤销', '撤销按钮文案正确', st.actText);
   ok(st.visRows === 2, '★★ 5 秒之内记录**还在**（这就是「可以反悔」的全部含义）', 'visRows=' + st.visRows);
   ok(st.storeCount === 2, '★★ 本机存储也还没动', String(st.storeCount));
