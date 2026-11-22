@@ -1426,11 +1426,13 @@ async function main() {
     })()`);
     ok(/离开房间/.test(hasLeave || ''), '★ 旁听卡自带「离开房间」出口（动作条整块藏了）', JSON.stringify(hasLeave));
     await evaluate('document.querySelector("#spectator .btn").click()');
-    /* 离开之前 onLeave 会先 fetch 一次快照（最长 2.5 秒）再弹确认框 ——
-     * 点完立刻看 #confirm-modal 一定是 false，得等它出来。 */
-    const askLeave = await waitFor('__journey.vis("confirm-modal")', 8000, '离开没弹确认框');
-    ok(askLeave, '★ 旁听时离开仍然先问一次');
-    if (askLeave) await evaluate('document.getElementById("btn-confirm-ok").click()');
+    /* v155 用户裁决：离开房间直接退 —— 不再弹确认框，也不再为确认文案走一趟网络快照
+     * （见 pwa/js/game.js 的 onLeave 头注释）。所以这里守的是**新契约**：
+     * 点离开不出现确认框，直接回首页。
+     * 原断言「仍然先问一次」守的是已被移除的行为，留着只会永远红，
+     * 而且会让后来的人误以为「不弹框」是 bug。改成守反面，强度不降反升。 */
+    const askLeave = await waitFor('__journey.vis("confirm-modal")', 1500, '');
+    ok(!askLeave, '★ 旁听时点离开不弹确认框（v155 契约：直接退）', 'confirm-modal=' + askLeave);
     const leftToHome = await waitFor('__journey.vis("screen-home")', 12000, '旁听后没离开房间');
     ok(leftToHome, '★ 旁听状态下能正常离开 → 回到首页（不被锁在房间里）');
   } else {
@@ -1492,8 +1494,10 @@ async function main() {
   ok(aiInfo.noteHidden === false, '★ 列表上方出现人机说明行', JSON.stringify(aiInfo));
   /* 正文前面还有一枚「含人机」芯片，所以文案本身从「N 局」起头，
    * 不再重复「人机对局」三个字（否则读成「含人机人机对局」）。 */
-  /* v110：单位统一成「场」（aiCount 是场数）。原来是「局」，产品改了这里就得跟。 */
-  ok(/^\d+ 场/.test(aiInfo.noteText || '') && /不计入战绩与排行榜/.test(aiInfo.noteText),
+  /* 量词契约（见 pwa/js/recordsView.js 的 rp-ai-note 段）：局 = 一整场对局，三处都写「局」。
+   * v110 这里曾要求「场」，产品后来又统一回「局」并把契约写进了源码注释 ——
+   * 断言守的是「数字 + 单位 + 不计入战绩与排行榜」这个形态，单位跟真源走。 */
+  ok(/^\d+ 局/.test(aiInfo.noteText || '') && /不计入战绩与排行榜/.test(aiInfo.noteText),
     '★ 说明行写清「不计入战绩与排行榜」', aiInfo.noteText);
   ok(aiInfo.total === '0', '★ 累计净胜仍是 0（那一局 +/− 没有混进汇总）', aiInfo.total);
   if (SHOTS) console.log('    截图：' + (await shot('records')));
@@ -1534,14 +1538,14 @@ async function main() {
      * 写成数字只会在场景一变时假红，然后被人把数字改大，守的东西一点没变。 */
     ok(rv.packs >= 2, '★ 回放里是整场（不是单把兜底）', JSON.stringify(rv));
     ok(/这一局/.test(rv.title), '★ 标题写「这一局」（走的是整场档案，不是单把兜底）', JSON.stringify(rv.title));
-    /* 副标题有两种合法形态（v124）：
-     *   「整场 N 把」—— 这份档案只有一局；
+    /* 副标题有两种合法形态（见 pwa/js/recordsView.js 的 replaySubText）：
+     *   「整局 N 把」—— 这份档案只有一局；
      *   「N 局 · M 把」—— 同一个房间里打完一局又点了「开始下一局」。
      * 档案是按**房间**攒的（房号 + 建房时间），续局不换房间，所以跨局是正常的。
      * 这里守「数字与实际把数一致」，不守某一种措辞 —— 写死措辞只会在场景一变时假红。 */
     const subNums = String(rv.sub).match(/\d+/g) || [];
     const subPacks = subNums.length ? Number(subNums[subNums.length - 1]) : -1;
-    ok(/^(整场 \d+ 把|\d+ 局 · \d+ 把)$/.test(String(rv.sub)) && subPacks === rv.packs,
+    ok(/^(整局 \d+ 把|\d+ 局 · \d+ 把)$/.test(String(rv.sub)) && subPacks === rv.packs,
       '★ 副标题里的把数与实际把数一致', JSON.stringify(rv.sub) + ' / packs=' + rv.packs);
 
     /* ★ 「第 N 把」的数字不能是跨局连续的身份号。
