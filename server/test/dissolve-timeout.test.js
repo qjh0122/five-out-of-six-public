@@ -152,7 +152,10 @@ async function run() {
   eq(room.dissolve.active, true, '投票已开始');
   eq(room.dissolve.initiatorId, a.playerId, '发起人是甲');
 
-  room = await waitForRoom(a, (r) => r.dissolve && r.dissolve.active === false, 3000);
+  /* 窗口给到 8s：超时本身是 1200ms，但 CI 同机并跑 5 个 job 时服务端事件循环会被压，
+   * 实测 3s 窗口会假红（2026-11-22 那轮就是这个：本轮 test job 红、同代码上一轮绿）。
+   * 轮询一旦 cond 成立立刻返回，所以放宽上限不会让本地变慢。 */
+  room = await waitForRoom(a, (r) => r.dissolve && r.dissolve.active === false, 8000);
   eq(room.dissolve.active, false, '超时后投票自动关闭（不再永久卡住）');
   eq(room.dissolve.lastReason, 'expired', '结束原因记为 expired（界面提示「超时自动取消」）');
   eq(room.phase, SM.PHASE.ROUND1_SPLIT, '房间仍在第一轮分牌 —— 交易没被解散');
@@ -160,7 +163,7 @@ async function run() {
   eq(b.me(room).score, CONFIG.INITIAL_SCORE, '乙没被扣分');
   /* 手牌必须从**乙自己的视角**看：服务端按视角裁剪，别人看到的 hand 是空的
    * （同一份快照里 a.me(room).hand 也是空的，拿错视角会得到「手牌被清了」的假结论）。 */
-  const roomB = await waitForRoom(b, (r) => r.dissolve && r.dissolve.active === false, 2000);
+  const roomB = await waitForRoom(b, (r) => r.dissolve && r.dissolve.active === false, 5000);
   eq(b.me(roomB).hand.length, 6, '乙的手牌还在（没有因为超时被清）');
 
   console.log('\n[超时后可以正常开下一把 / 继续玩]');
@@ -170,14 +173,16 @@ async function run() {
 
   /* ---------------------------------------------------------------- */
   console.log('\n[发起 → 发起人自己取消]');
+  /* 下面几处原先是 `await wait(60)` 赌「广播 60ms 内到达」。本机空载成立，
+   * CI 同机并跑 5 个 job 时不成立 —— v128 修过同类问题（80ms → 轮询），
+   * 这几个点漏改了。统一改成等**状态变化**：cond 成立立刻返回，本地仍是几十毫秒。 */
   await a.request('proposeDissolve');
-  await wait(60);
-  eq(a.lastRoom().dissolve.active, true, '新一轮投票开始');
+  room = await waitForRoom(a, (r) => !!(r.dissolve && r.dissolve.active === true), 5000);
+  eq(room.dissolve.active, true, '新一轮投票开始');
   const noPerm = await b.request('cancelDissolve').then(() => true).catch(() => false);
   eq(noPerm, false, '非发起人取消被拒');
   await a.request('cancelDissolve');
-  await wait(60);
-  room = a.lastRoom();
+  room = await waitForRoom(a, (r) => r.dissolve && r.dissolve.active === false, 5000);
   eq(room.dissolve.active, false, '发起人取消成功');
   eq(room.dissolve.lastReason, 'cancelled', '结束原因记为 cancelled');
   eq(room.phase, SM.PHASE.ROUND1_SPLIT, '取消后仍在分牌阶段');
@@ -185,10 +190,9 @@ async function run() {
   /* ---------------------------------------------------------------- */
   console.log('\n[发起 → 有人拒绝 → rejected（与超时区分开）]');
   await a.request('proposeDissolve');
-  await wait(60);
+  room = await waitForRoom(a, (r) => !!(r.dissolve && r.dissolve.active === true), 5000);
   await b.request('voteDissolve', { agree: false });
-  await wait(60);
-  room = a.lastRoom();
+  room = await waitForRoom(a, (r) => r.dissolve && r.dissolve.active === false, 5000);
   eq(room.dissolve.active, false, '被否决后投票关闭');
   eq(room.dissolve.lastReason, 'rejected', '结束原因记为 rejected');
   eq(room.phase, SM.PHASE.ROUND1_SPLIT, '否决不会结束对局');
@@ -196,9 +200,9 @@ async function run() {
   /* ---------------------------------------------------------------- */
   console.log('\n[发起 → 全员同意 → 照常结算（原有行为不能被改坏）]');
   await a.request('proposeDissolve');
-  await wait(60);
+  room = await waitForRoom(a, (r) => !!(r.dissolve && r.dissolve.active === true), 5000);
   await b.request('voteDissolve', { agree: true });
-  room = await waitForRoom(a, (r) => r.phase === SM.PHASE.SETTLED, 3000);
+  room = await waitForRoom(a, (r) => r.phase === SM.PHASE.SETTLED, 8000);
   eq(room.phase, SM.PHASE.SETTLED, '全员同意 → 直接结算');
   eq(room.dissolve.active, false, '结算后投票状态已清');
 
