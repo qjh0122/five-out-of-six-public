@@ -317,7 +317,7 @@ v104 判断「注释改了要重跑全量」的代价已经不值一提（本来
 ### C13 公库 CI 的 `test` job 在「回填文档」那次提交上连续红 —— **已定位并修复（v128）**
 <!-- STATUS: closed | v128：根因是 dissolve-timeout 的 300ms 窗口太窄；已放大到 1200ms -->
 
-**现象**：公开镜像仓库（`qjh0122/six-out-of-five`）的 Actions，`test` job 在
+**现象**：公开镜像仓库（`qjh0122/six-out-of-five-public`）的 Actions，`test` job 在
 v125 / v126 / v127 的**「回填发布事实」提交**上连续失败（`Process completed with exit code 1`，
 `npm test` 跑 85 秒后退出），而紧挨着的「同步代码」提交是绿的。
 两个提交的内容只差 `docs/release-progress.md` 一个文件。
