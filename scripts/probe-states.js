@@ -686,8 +686,11 @@ async function main() {
     ok(st.offBtns === 1, '★ 离线态只有 1 个按钮（重新载入）');
     ok(/现在没有网络/.test(st.offTitle), '★ 离线标题是「现在没有网络」', st.offTitle);
     /* ★★★ F1：strip 形态保持原句（本机确实有记录，"先给你看这台设备上的"是真的）。
-     * 与 [8] 那条成对：只改 panel 那一档，不许把两档写成同一句，也不许反过来。 */
-    ok(st.offSub === '先把这台设备上的记录给你看',
+     * 与 [8] 那条成对：只改 panel 那一档，不许把两档写成同一句，也不许反过来。
+     * 文案真源：pwa/js/recordsState.js 的 sub（第 71 / 91 行）+ pwa/index.html 的
+     * [data-rstate-sub]。原句是「先把这台设备上的记录给你看」，产品已收短成
+     * 「先把本机战绩给你看」，断言跟着真源走 —— 措辞不该在这边抄第二份。 */
+    ok(st.offSub === '先把本机战绩给你看',
       '★★★ F1：strip 形态的副文案保持原句', st.offSub);
 
     /* ★★★★ M4（正向）：离线 + 本机有内容 → **内容必须可见**。
@@ -798,11 +801,11 @@ async function main() {
       '★★ 反向场景里其余载体也都不露（互斥组 0 个可见，只有离线块）', JSON.stringify(st.mutex));
     ok(/^—\/\d+$/.test(st.achText), '★★★ M3：这一屏的成就数同样是「—/N」（离线问不到账号）', st.achText);
     /* ★★★★ F1：panel 形态必须有**自己的**副文案。
-     * 本机 0 局时还说「先把这台设备上的记录给你看」，而底下什么都没有 ——
+     * 本机 0 局时还说「先把本机战绩给你看」，而底下什么都没有 ——
      * 那不是措辞不好，是假话（制作人裁定 R8）。 */
     ok(st.offSub === '连上网就能看到账号里的记录',
       '★★★★ F1：panel 形态用自己的副文案', st.offSub);
-    ok(st.offSub !== '先把这台设备上的记录给你看',
+    ok(st.offSub !== '先把本机战绩给你看',
       '★★★ F1：panel 没有沿用 strip 那句（沿用 = 没修）', st.offSub);
     const p7 = await shot('states-offline-panel.png');
     if (p7) console.log('    图：' + p7);
