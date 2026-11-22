@@ -228,8 +228,10 @@ head('[5] 战绩 / 记录 不再混用');
   const badJs = allStrings.filter((s) => /清除记录|战绩记录|局记录|设备上的记录|已清除这台设备上的记录/.test(s));
   eq(badJs.length, 0, '★★ JS 可见字符串里没有「记录」指战绩数据', badJs.slice(0, 3).join(' | '));
   ok(allStrings.some((s) => s.indexOf('本机战绩已清除') >= 0), '★ 两种回执收敛成「本机战绩已清除」');
-  ok(jsSrc['recordsView.js'].indexOf("+ '战绩' + (withCloud") >= 0,
-    '★ 撤销条的 msg 也是拼接出「战绩」（只改确认框等于没改）');
+  /* 撤销条那句的拼接点搬进了 recordsState.clearConfirm()（探针与视图共用一份），
+   * 断言跟着句子走 —— 判据本身没松：换个文件写「记录」照样红。 */
+  ok(jsSrc['recordsState.js'].indexOf("+ '战绩' + (withCloud") >= 0,
+    '★ 撤销条的 msg 也是拼接出「战绩」（句子在 recordsState.clearConfirm，只改确认框等于没改）');
   /* 「过程记录」「下载记录」是别的语义（回放步骤 / 浏览器下载列表），刻意保留。 */
   ok(allStrings.some((s) => s.indexOf('过程记录') >= 0), '★ 不同语义的「过程记录」保留，不被误伤');
 }

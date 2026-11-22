@@ -83,7 +83,9 @@ head('[4] recordsView：延迟执行，而不是先删再回滚');
   ok(!!body, '找到 onClearConfirmed');
   const b = body ? body[1] : '';
   ok(/function doClear\(/.test(b), '★ 真正的删除被收进 doClear()');
-  ok(/if \(!undoBar\) \{ doClear\('no-bar'\); return; \}/.test(b), '★ 没有条子时退回立刻清（不静默丢弃）');
+  /* 条件多了一条「或拿不到文案表」：旧缓存里没有 recordsState.js 时也走立刻清 ——
+   * 少一个提示 ≠ 取消这个动作。断言只钉住"退回立刻清"这个结果。 */
+  ok(/if \(!undoBar[^{]*\{ doClear\('no-bar'\); return; \}/.test(b), '★ 没有条子时退回立刻清（不静默丢弃）');
   ok(/onCommit: function \(reason\) \{[\s\S]*?doClear\(reason\);/.test(b), '★★ onCommit 里才真的清');
   /* 抄近路的写法：确认后直接 Records.clear() / resetMyStats()，那样 5 秒窗口等于不存在。
    * 注意 doClear 的**函数定义**本身也含这两句 —— 它本来就该含，所以先把整段定义抠掉再看。

@@ -268,10 +268,15 @@ head('[5b] 页脚那一行与成就数字：离线时不许邀请注定失败的
   /* ★★★★ M2：页脚的三个分支里，离线那一支必须**先**出现。
    * 顺序错了的表现不是报错，是离线时页脚说「账号数据暂时读不到」——
    * 那不是"读不到"，是根本没发，属于结果误报。 */
-  const iOffline = src.indexOf("'只在这台设备上，换设备会丢'");
-  const iDegradedText = src.indexOf("'账号数据暂时读不到");
+  /* 句子搬进了 recordsState.SOURCE_TEXT（视图只是引用），所以这里量的是**分支顺序**：
+   * localOnly 那一支必须出现在 degraded 那一支之前。顺序错了的表现不是报错，
+   * 是离线时页脚说「账号数据暂时读不到」—— 那不是"读不到"，是根本没发。 */
+  const iOffline = src.indexOf('SRC.localOnly');
+  const iDegradedText = src.indexOf('SRC.degraded');
   ok(iOffline > 0 && iDegradedText > iOffline,
-    '★★★★ M2：「只在这台设备上」那一支写在「读不到」之前（离线优先）', iOffline + ' vs ' + iDegradedText);
+    '★★★★ M2：离线那一支（SOURCE_TEXT.localOnly）写在降级那一支之前（离线优先）', iOffline + ' vs ' + iDegradedText);
+  /* 反向：页脚不许再出现第二份句子副本（都从 SOURCE_TEXT 取） */
+  ok(!/=\s*['"]只在这台设备上/.test(src), '★★★ 页脚没有第二份"只在这台设备上"的副本（只引用不抄写）');
 
   /* ★★★ M3：成就数字不许再用 `|| 0` 把未知吞成零 */
   ok(RECORDS.indexOf('Number(cloudRecords.achCount)) || 0') < 0,

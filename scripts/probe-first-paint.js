@@ -23,6 +23,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
+/* 段标题从 scripts/lib/ci-need.js 取 —— CI 核日志用的是同一份字符串。
+ * 这里以前各写一份，加/删一段之后 CI 仍在等旧的那一段，必红。 */
+const { segment } = require('./lib/ci-need');
 
 const W = Number(process.argv[2]) || 390;
 const H = Number(process.argv[3]) || 844;
@@ -156,7 +159,7 @@ async function main() {
   /* ================================================================
    * A. 未登录
    * ============================================================== */
-  console.log('[A] 未登录时的首帧');
+  console.log('\n' + segment('firstPaint', 0));
   await cdp.send('Page.navigate', { url: URL0 });
   await sleep(2000);
   await evaluate("try{localStorage.clear()}catch(e){}");
@@ -214,7 +217,7 @@ async function main() {
   /* ================================================================
    * B. 有会话
    * ============================================================== */
-  console.log('\n[B] 有会话时的首帧');
+  console.log('\n' + segment('firstPaint', 1));
   await evaluate(`(function(){
     try {
       localStorage.setItem('lxw_session_v1', JSON.stringify({
@@ -265,7 +268,7 @@ async function main() {
    * 但注释当时没跟着改，于是这条探针成了唯一还记着旧口径的地方 —— 它红了两年没人看，
    * 正是因为没人跑它。所以这里改的是**探针与注释**，不是产品行为。
    * ============================================================== */
-  console.log('\n[C] localStorage 抛异常时的兜底');
+  console.log('\n' + segment('firstPaint', 2));
   {
     /* 用 addScriptToEvaluateOnNewDocument 在页面脚本之前把 localStorage 换成一个会抛的桩。
      * 期望：不加 .no-session（当作已登录）→ 首页可见 → 至少不是白屏。 */
@@ -308,7 +311,7 @@ async function main() {
   /* ================================================================
    * D. 放开 game.js：boot 跑完之后，缩放必须与 head 预算的值一致（不能跳变）
    * ============================================================== */
-  console.log('\n[D] boot 接管后与首帧预缩放是否一致（不能跳变）');
+  console.log('\n' + segment('firstPaint', 3));
   {
     BLOCK_GAME_JS = false;
 

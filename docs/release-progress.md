@@ -37,7 +37,8 @@
 
 | 项 | 现在的值 | 怎么复算 |
 |---|---|---|
-| 线上版本 | `20261120h` / sw `v159` | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
+| 线上版本 | `20261120h` / sw `v159`（线上仍是 2026-11-20 音效版，本轮未发布） | `grep -o '2026111[0-9a-z]*' pwa/index.html`；`grep 'CACHE_NAME' pwa/sw.js` |
+| 工作区版本 | `20261122a` / sw `v160`（2026-11-22 探针断言清单重构；只动测试层与文案真源，线上行为未变） | 同上；发布后再把上面那一行的数字改成这一行 |
 | 线上核对 | **15/15 通过**（2026-11-20 音效改造版 `20261120h` 发布后实跑；版本号回读 = `20261120h`，manifest 图标 data URI 注入正常、无 screenshots 死链、installability 0 错、无 JS 异常 / console.error / HTTP≥400 / SW 已接管） | `node scripts/probe-online-smoke.js <url>` |
 | 部署方式（★ 别再用错） | 必须从**项目根**以 **node / http-service** 部署（`workbuddy_sites_deploy` directory=仓库根、language=node），sandbox `74c12371a7504089906cb1387afd7908`。**不能**用 `language=static` + directory=`pwa/`——那样没有 `server/index.js` 运行时注入 manifest 图标 data URI，线上图标会退化成 `/icons/*.png`（被网关剥 sharecode 后 403），冒烟 13/15。2026-11-20 音效发布踩过一次，已即时纠正。 | `curl -s "<url>/manifest.webmanifest?sharecode=<sc>" \| grep -o 'data:image/png' \| head -1` 应命中 |
 | 指定头像 | **5 人**（playerId → 文件名见 `pwa/js/avatar.js` 的 CUSTOM 表；仓库里不写昵称）。`pwa/assets/avatar-custom/` 下 5 张 128×128 webp，线上逐个 200 `image/webp`、体积与本地一致；映射键是 playerId 不是昵称。其余玩家仍走 48 款预设 | `curl -o /dev/null -w '%{http_code} %{size_download}' "<url>/assets/avatar-custom/will.webp?sharecode=<sc>"` |
@@ -5569,3 +5570,23 @@ v149 的规则是「上方放不下 → 翻到下方 → 水平居中后夹进�
 - 未做「真人玩一局」的手感验证：操作响应、消除时机、U4 改的 pressBusy 控制流「连点等人是否卡忙碌态」、断网 toast，均需真人复验。
 - 旁听卡字号（`.sp-title` 40 / `.sp-tip` 26）与 13 个圆角几何项按「观感明显变化不硬压」保守保留，需真机截图才能判能否并档。
 - 半行硬切 2 条（结算 91% / 规则 82%）是既有的滚动容器行为，本轮未动。
+
+## v160 · 测试层「同一个事实只写一份」重构（2026-11-22，**未发布**）
+
+> 只动测试层与文案真源，线上行为零变化。`pwa/` 侧唯一改动是把句子收口到文案表，
+> 视图渲染的仍是同样的字。发布后再把上面卡片的「线上版本」改成 `20261122a` / sw `v160`。
+
+**起因**：11-18 到 11-22 那批 CI 假红查下来是同一个病 —— 产品改了措辞 / 量词 / 段结构，
+断言里抄的那一份没跟。六层问题里六层都是抄写，不是逻辑错。
+
+**改动**
+- 文案真源：`pwa/js/recordsState.js` 新增 `SOURCE_TEXT`（页脚三种说法）、`clearConfirm()`、`UNDO_ACTION`；`recordsView.js` 改为引用，不再现拼句子（旧缓存缺文案表时退回"立刻清"，少一个提示 ≠ 取消动作）。
+- 断言清单：新增 `scripts/lib/ci-need.js` —— 段标题与断言条数只有一份，探针打印它、CI 核它。`test.yml` 里四段中文标题数组与「通过 N 项」硬编码全部删除。
+- 策略词：新增 `scripts/lib/ui-copy.js`（`RETRY_WORDS` / `GENERIC_BANNED`）。单测的分类器自测与探针的全屏扫描共用同一条正则（此前两边各写一条，看着一样，实际已分叉）。
+- 探针：`probe-states.js` 的文案断言全部改从 `STATE_TEXT` / `ERR` / `SOURCE_TEXT` 取；`probe-undo.js` 的量词由 `clearConfirm(2)` 推出；`probe-first-paint.js` 段标题来自清单。
+- 四支接线单测（`states-wiring` / `undo-wiring` / `ui-copy-consistency` / `states`）跟着句子搬家改断言指向，**判据未放松**：`states.test.js` 新增四态文案的逐字钉（唯一副本）与「静态首帧 == 文案表」五组对账。
+
+**验收**
+- `npm test` **179 文件 / 7529 断言 / 0 失败**；`redset:selftest` 7/7、`redset:check` 12/12；`docs:check` 78/78；`probes:check` 44 条台账一致。
+- 真浏览器：`probe-undo` 390×844 与 320×568 各 19/19；`probe-states` 390×844 与 800×360 各 85/85；`probe-first-paint` 12/12；`probe-big-fx` 21/21；四份日志都过 `ci-need --verify`（负向：拿四态日志当撤销条校验 → exit 3）。
+- 变异自证：`STATE_TEXT.offline.title` 改一个字 → 单测 2 条红；页脚改成硬编码旧句 → `probe-states` M2 红（exit 1）。两次都还原并复跑绿。

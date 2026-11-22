@@ -49,6 +49,13 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 const { findBrowser } = require('./lib/browser');
+/* 文案一律从产品真源读（pwa/js/recordsState.js 的 STATE_TEXT / ERR / SOURCE_TEXT）。
+ * 这个探针以前把句子抄在这儿，于是产品收短一次文案、改一次量词，
+ * 探针就整段假红 —— 而产品是对的。判据仍然有效：它现在还量"屏幕上那几块
+ * 显示的字**是不是文案表里那一句**"，只是不再自带副本。
+ * 禁用词这类**策略**词表在 scripts/lib/ui-copy.js（单测与探针共用一条正则）。 */
+const RS = require('../pwa/js/recordsState');
+const { RETRY_WORDS, GENERIC_BANNED, hitsOf } = require('./lib/ui-copy');
 
 const W = Number(process.argv[2]) || 390;
 const H = Number(process.argv[3]) || 844;
@@ -557,7 +564,8 @@ async function main() {
   ok(st.ctaVis === false, '★★★ 空态的「创建房间」CTA 不可见（等待期间它是可点的，既是误导也是竞态）');
   ok(st.loadBtns === 0, '★★★★ 加载态容器内 button 数 = 0（零按钮是它和空态的分界）');
   ok(st.mutexCount === 1, '★ 稳定后互斥组恰有 1 个可见（S1）', String(st.mutexCount));
-  ok(/正在读取战绩/.test(st.loadTitle), '★ 加载标题是「正在读取战绩…」', st.loadTitle);
+  ok((st.loadTitle || '').indexOf(RS.STATE_TEXT.loading.title) >= 0,
+    '★ 加载标题与文案表同句（' + RS.STATE_TEXT.loading.title + '）', st.loadTitle);
   ok(!!st.loadRect && st.loadRect.h > 0 && st.loadTitle.length > 0, '★★ S4：加载块有尺寸且文本非空', JSON.stringify(st.loadRect));
   ok(/(^|\D)0(\D|$)/.test(st.loadTitle + st.loadSub) === false, '★ 加载态自己的文案里没有数字 0（不用"0"冒充未知）');
   /* ★ M3：右上角成就数字也一样。加载中我们**没问过账号**，写 0/35 是在说
@@ -568,7 +576,8 @@ async function main() {
 
   await sleep(700);                        // 累计约 1.2s：越过 1s 慢文案线
   st = await read();
-  ok(/比平时慢一点/.test(st.loadSub), '★★ 超过 1 秒换成「比平时慢一点，再等等」（不加进度条）', st.loadSub);
+  ok((st.loadSub || '').indexOf(RS.STATE_TEXT.loading.slow) >= 0,
+    '★★ 超过 1 秒换成文案表的慢文案「' + RS.STATE_TEXT.loading.slow + '」（不加进度条）', st.loadSub);
   ok(st.loadBtns === 0, '★ 慢文案期间仍然零按钮');
 
   console.log('\n[2] 失败态：两个按钮、命中区够大、原因必须可见（S5 / S6 / S7）');
@@ -581,9 +590,15 @@ async function main() {
   ok(st.failBtnRects.length === 2, '★★★ 失败态两个按钮（可重试类）', JSON.stringify(st.failBtnRects));
   const big = st.failBtnRects.filter((r) => r.w >= 44 && r.h >= 44);
   ok(big.length >= 1, '★★★ S5：重试控件命中区 ≥44×44 CSS px（' + JSON.stringify(st.failBtnRects.map((r) => r.w + '×' + r.h)) + '）');
-  ok(/读不到|没读上来|失败|未同步/.test(st.visibleText), '★★★ S7：失败原因出现在**可见**文本里（遍历 DOM + checkVisibility 过滤后拼接）');
+  /* 500 落 err.net.server；把 timeout 那句也认下来（同一类"读不到"），
+   * 两句都来自 ERR 表，不是这里现写的。 */
+  const FAIL_TITLES = [RS.ERR['err.net.server'].title, RS.ERR['err.net.timeout'].title];
+  ok(FAIL_TITLES.some((t) => (st.visibleText || '').indexOf(t) >= 0),
+    '★★★ S7：失败原因出现在**可见**文本里（遍历 DOM + checkVisibility 过滤后拼接）—— 找的是 ERR 表的标题');
   ok(st.failSub.length > 0, '★ 失败副文案非空', st.failSub);
-  ok(!/操作失败|请稍后重试|网络异常|请求失败|系统繁忙/.test(st.visibleText), '★★ 全屏可见文本里没有禁用词');
+  ok(hitsOf(GENERIC_BANNED, st.visibleText).length === 0,
+    '★★ 全屏可见文本里没有套话禁用词（' + GENERIC_BANNED.source + '）',
+    hitsOf(GENERIC_BANNED, st.visibleText).join(','));
   ok(st.mutexCount === 1, '★ 失败态时互斥组仍恰有 1 个可见');
   ok(/^—\/\d+$/.test(st.achText), '★★★★ M3：失败时成就数仍是「—/N」（读不到 ≠ 0 个）', st.achText);
   const p2 = await shot('states-fail.png');
@@ -626,13 +641,15 @@ async function main() {
     await waitFor(`(function(){ return document.getElementById('screen-records').getAttribute('data-rstate') === 'fail'; })()`, 4000);
     st = await read();
     ok(st.failVis === true, '★ 401 落到失败态');
-    ok(/登录/.test(st.failTitle), '★★ 文案说清是"登录"这一类问题（不是"网络不好"）', st.failTitle);
+    ok((st.failTitle || '').indexOf(RS.ERR['err.data.auth'].title) >= 0,
+      '★★ 文案说清是"登录"这一类问题（ERR 表 err.data.auth 那句，不是"网络不好"）', st.failTitle);
     const btns = st.failBtnRects.map((r) => r.label);
     ok(btns.length === 1, '★★★ L2 只有一条出路（实际 ' + JSON.stringify(btns) + ' 个）');
     ok(btns.every((b) => /重新登录|返回登录|去登录/.test(b)), '★★ 那条出路落在白名单内（' + JSON.stringify(btns) + '）');
-    ok(!/再试一次|再试|重试|稍后再试|稍后重试/.test(st.visibleText),
-      '★★★★ S12：L2 屏的可见文案不含禁用词（含"请重新登录"这种不误伤的情形）');
-    ok(!/再试一次/.test(st.visibleText), '★★★ 一个字都不出现「再试一次」');
+    ok(hitsOf(RETRY_WORDS, st.visibleText).length === 0,
+      '★★★★ S12：L2 屏的可见文案不含重试词（含"请重新登录"这种不误伤的情形）',
+      hitsOf(RETRY_WORDS, st.visibleText).join(','));
+    ok((st.visibleText || '').indexOf('再试一次') < 0, '★★★ 一个字都不出现「再试一次」');
     const p3 = await shot('states-l2.png');
     if (p3) console.log('    图：' + p3);
   }
@@ -668,7 +685,8 @@ async function main() {
      * 或"本来就长这样"而假绿 —— 那种绿的断言等于没写。 */
     st = await read();
     ok(st.srcRetryVis === true, '★ 前提：降级时页脚出口此刻可见（M1 的断言不许空过）');
-    ok(/读不到/.test(st.srcText), '★ 前提：此刻页脚说的是「账号数据暂时读不到」（M1/M2 的对照）', st.srcText);
+    ok(st.srcText === RS.SOURCE_TEXT.degraded,
+      '★ 前提：此刻页脚说的是降级那句（M1/M2 的对照）', st.srcText);
 
     cdp.reset();
     const n0 = { records: cdp.count('/api/me/records'), rank: cdp.count('/api/leaderboard') };
@@ -684,14 +702,15 @@ async function main() {
     ok(st.dataVis === true, '★★★ 内容照常显示（这是全局唯一的双显豁免：不能因为没网就没收玩家能看的战绩）');
     ok(st.offAlign === 'left', '★★★ 离线块左对齐（结构差异，不是口味；改成居中就退化成第二个空态）', st.offAlign);
     ok(st.offBtns === 1, '★ 离线态只有 1 个按钮（重新载入）');
-    ok(/现在没有网络/.test(st.offTitle), '★ 离线标题是「现在没有网络」', st.offTitle);
+    ok((st.offTitle || '').indexOf(RS.STATE_TEXT.offline.title) >= 0,
+      '★ 离线标题与文案表同句（' + RS.STATE_TEXT.offline.title + '）', st.offTitle);
     /* ★★★ F1：strip 形态保持原句（本机确实有记录，"先给你看这台设备上的"是真的）。
      * 与 [8] 那条成对：只改 panel 那一档，不许把两档写成同一句，也不许反过来。
-     * 文案真源：pwa/js/recordsState.js 的 sub（第 71 / 91 行）+ pwa/index.html 的
-     * [data-rstate-sub]。原句是「先把这台设备上的记录给你看」，产品已收短成
-     * 「先把本机战绩给你看」，断言跟着真源走 —— 措辞不该在这边抄第二份。 */
-    ok(st.offSub === '先把本机战绩给你看',
-      '★★★ F1：strip 形态的副文案保持原句', st.offSub);
+     * 两句都从 STATE_TEXT.offline 取（sub / subPanel）—— 这个探针**不带文案副本**。
+     * 曾经这里写死过旧句「先把这台设备上的记录给你看」，产品收短成
+     * 「先把本机战绩给你看」之后，这一条静静红了一整轮。 */
+    ok(st.offSub === RS.STATE_TEXT.offline.sub,
+      '★★★ F1：strip 形态的副文案与文案表同句', st.offSub);
 
     /* ★★★★ M4（正向）：离线 + 本机有内容 → **内容必须可见**。
      * 这是本设计最怕退化的地方：把离线做成满屏态，等于用"你没有网"惩罚玩家。
@@ -710,8 +729,8 @@ async function main() {
     ok(st.srcRetryVis === false, '★★★★ M1：离线时页脚不再挂「再读一次」（注定失败的动作不许邀请）');
     /* ★★★★ M2：离线时页脚换口径 ——「读不到」在离线语境下是结果误报（根本没发），
      * 而且不能与横条那句同义重复。 */
-    ok(st.srcVis === true && st.srcText === '只在这台设备上，换设备会丢',
-      '★★★★ M2：离线时页脚走「只在这台设备上」那一支', st.srcText);
+    ok(st.srcVis === true && st.srcText === RS.SOURCE_TEXT.localOnly,
+      '★★★★ M2：离线时页脚走「只在这台设备上」那一支（SOURCE_TEXT.localOnly）', st.srcText);
     ok(st.srcText !== st.offSub,
       '★★★ M2：页脚不与横条同义（同一屏同一句话说两遍，玩家会以为漏了什么）',
       st.srcText + '  vs  ' + st.offSub);
@@ -761,7 +780,7 @@ async function main() {
      * 所以这里等的是那次失败落地。 */
     await waitFor(`(function(){ var b = document.getElementById('records-source-retry'); return !!(b && !b.classList.contains('hidden')); })()`, 4000);
     st = await read();
-    ok(st.srcRetryVis === true && /读不到/.test(st.srcText),
+    ok(st.srcRetryVis === true && st.srcText === RS.SOURCE_TEXT.degraded,
       '★★ M1 反向：网络回来、云端仍失败 → 出口回到页脚（离线这一支不该赖着不走）', st.srcText);
   }
 
@@ -803,9 +822,9 @@ async function main() {
     /* ★★★★ F1：panel 形态必须有**自己的**副文案。
      * 本机 0 局时还说「先把本机战绩给你看」，而底下什么都没有 ——
      * 那不是措辞不好，是假话（制作人裁定 R8）。 */
-    ok(st.offSub === '连上网就能看到账号里的记录',
-      '★★★★ F1：panel 形态用自己的副文案', st.offSub);
-    ok(st.offSub !== '先把本机战绩给你看',
+    ok(st.offSub === RS.STATE_TEXT.offline.subPanel,
+      '★★★★ F1：panel 形态用自己的副文案（subPanel）', st.offSub);
+    ok(st.offSub !== RS.STATE_TEXT.offline.sub,
       '★★★ F1：panel 没有沿用 strip 那句（沿用 = 没修）', st.offSub);
     const p7 = await shot('states-offline-panel.png');
     if (p7) console.log('    图：' + p7);

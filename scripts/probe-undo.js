@@ -26,6 +26,12 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 const { findBrowser } = require('./lib/browser');
+/* 段标题与撤销条文案都**不在这里写**：
+ *   段标题 → scripts/lib/ci-need.js（CI 核日志用的是同一份字符串）
+ *   文案   → pwa/js/recordsState.js（产品真源，量与词都从那儿取）
+ * 上一轮这两处各抄了一份，产品把「场」改成「局」而这里没跟，于是每条都红。 */
+const { segment } = require('./lib/ci-need');
+const RS = require('../pwa/js/recordsState');
 
 const W = Number(process.argv[2]) || 390;
 const H = Number(process.argv[3]) || 844;
@@ -266,24 +272,27 @@ async function main() {
     };
   })()`;
 
-  console.log('\n[1] 打开战绩页，确认有数据');
+  console.log('\n' + segment('undo', 0));
   await evaluate(`document.getElementById('btn-records-home').click()`);
   await sleep(700);
   let st = await evaluate(readState);
   ok(st.rows === 2, '★ 战绩页读到 2 条记录（种子生效）', JSON.stringify({ rows: st.rows }));
 
-  console.log('\n[2] 确认清除 → 条子弹出，但**记录还在**');
+  console.log('\n' + segment('undo', 1));
   await evaluate(`document.getElementById('btn-records-clear').click()`);
   await sleep(400);
   await evaluate(`document.getElementById('btn-records-clear-ok').click()`);
   await sleep(300);
   st = await evaluate(readState);
   ok(st.barShown === true, '★★ 条子弹出来了', JSON.stringify(st));
-  /* 量词契约：recordsView.js 的清除确认文案是「将清除 N 局战绩」（第 1875 行），
-   * 与 ai-note 那行同一套口径（局 = 一整场对局，三处都写「局」）。
-   * 这里原先写「N 场」，UI 收口到「局」之后这条就一直假红。 */
-  ok(/将清除 2 局/.test(st.msg || ''), '★★ 文案说清了「将清除几局」（不是一句模糊的"已清除"）', st.msg);
-  ok((st.actText || '').trim() === '撤销', '撤销按钮文案正确', st.actText);
+  /* 量词与句式都取自产品真源：recordsState.clearConfirm(2, ...) 的前半句
+   * 「将清除 2 局战绩」。只取前半句是有意的 —— 括号里那半段随"勾没勾云端"变，
+   * 这里量的是**数量和量词**（这条断言上一版死在量词上：那时写死「2 场」）。
+   * 文案真源：pwa/js/recordsState.js 的 clearConfirm()。 */
+  const wantMsgHead = RS.clearConfirm(2, false).split('（')[0];
+  ok((st.msg || '').indexOf(wantMsgHead) === 0,
+    '★★ 文案说清了「将清除几局」（不是一句模糊的"已清除"）—— 与 clearConfirm(2) 同句', st.msg);
+  ok((st.actText || '').trim() === RS.UNDO_ACTION, '撤销按钮文案与 UNDO_ACTION 一致', st.actText);
   ok(st.visRows === 2, '★★ 5 秒之内记录**还在**（这就是「可以反悔」的全部含义）', 'visRows=' + st.visRows);
   ok(st.storeCount === 2, '★★ 本机存储也还没动', String(st.storeCount));
   ok(st.actRect && st.actRect.h >= 40, '★ 撤销按钮够高（' + (st.actRect ? st.actRect.h : '?') + ' CSS px，点不中等于没这个功能）');
@@ -293,7 +302,7 @@ async function main() {
   const p1 = await shot('undo-bar.png');
   if (p1) console.log('    图：' + p1);
 
-  console.log('\n[3] 点「撤销」→ 一切回到没清过的样子');
+  console.log('\n' + segment('undo', 2));
   await evaluate(`document.getElementById('undo-act').click()`);
   await sleep(400);
   st = await evaluate(readState);
@@ -303,7 +312,7 @@ async function main() {
   const pHidden = await shot('undo-bar-hidden.png');       // 撤销条「消失」帧
   if (pHidden) console.log('    图：' + pHidden);
 
-  console.log('\n[4] 再确认一次，这次不撤销 → 5 秒后真的清掉');
+  console.log('\n' + segment('undo', 3));
   await evaluate(`document.getElementById('btn-records-clear').click()`);
   await sleep(400);
   await evaluate(`document.getElementById('btn-records-clear-ok').click()`);
@@ -324,7 +333,7 @@ async function main() {
   ok(st.emptyShown === true, '★ 切到空态（不是留一块空白）');
   ok(st.storeCount === 0, '★★ 本机存储也清了', String(st.storeCount));
 
-  console.log('\n[5] 条子隐藏后不占位');
+  console.log('\n' + segment('undo', 4));
   {
     const pos = await evaluate(`(function(){
       var bar = document.getElementById('undo-bar');

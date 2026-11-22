@@ -24,6 +24,10 @@ const fs = require('fs');
 const path = require('path');
 
 const RS = require(path.join(__dirname, '..', 'js', 'recordsState.js'));
+/* 禁用词口径与探针共用一条正则（scripts/lib/ui-copy.js）。
+ * 仍然是**手写的策略**，不是从实现里抄的 —— 但只写一份：
+ * 这里写 `稍后\s*(再试|重试)`、探针写 `稍后再试|稍后重试` 时，看着一样，实际已分叉。 */
+const { RETRY_WORDS } = require('../../scripts/lib/ui-copy');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -228,8 +232,10 @@ head('[4] 错误三级（QA S11）');
 head('[5] 禁用词分类器（QA S12 + S20）');
 {
   /* 禁用词表**手写**，不从实现字符串里抄（QA §1.3 的口径）。
-   * 「请重新登录」含「重」但不含禁用词 —— 这类不误伤正是下面自测要证明的。 */
-  const BANNED = /再试一次|再试|重试|稍后\s*(再试|重试)/;
+   * 「请重新登录」含「重」但不含禁用词 —— 这类不误伤正是下面自测要证明的。
+   * 正则本体现在只有一份，在 scripts/lib/ui-copy.js；本段的自测同时也在给探针
+   * 那条断言做背书（probe-states 用它扫全屏可见文本）。 */
+  const BANNED = RETRY_WORDS;
 
   const SAMPLES = [
     ['账号不存在，请再试一次', true, '精确命中'],
@@ -318,6 +324,75 @@ head('[8] 成就数字：拿不到确定值时写「—/N」，不许写 0/N');
   const unknownish = [null, undefined, '', NaN].map((v) => RS.achLabel(v, 35));
   eq(unknownish.filter((s) => /^0\//.test(s)).length, 0,
     '★★★★ 未知输入写成 0/N 的用例数 = 0', unknownish.join(','));
+}
+
+/* =================== [9] 句子只有一份：文案表 ↔ 视图 ↔ 静态首帧 =================== */
+head('[9] 句子只有一份：页脚 / 撤销条 / 静态首帧都取自文案表');
+{
+  /* 四态文案逐字（design §②-b）。这是**唯一**的逐字副本，故意的：
+   * 探针已经不再抄句子（它只量"页面显示的那块字是不是表里这一句"），
+   * 所以句子本身必须有一处能被判红的地方 —— 否则改错一个字永远没人发现。
+   * 分工：句子正确性在这里（便宜、精确），接线正确性在探针（真浏览器）。 */
+  const STATE_COPY = {
+    empty: ['还没有战绩，去开一局吧', '打完一局自动记下'],
+    loading: ['正在读取战绩…', '', '比平时慢一点，再等等'],
+    fail: ['账号数据没读上来', '这台设备上也没有可显示的战绩'],
+    offline: ['现在没有网络', '先把本机战绩给你看', '连上网就能看到账号里的记录']
+  };
+  Object.keys(STATE_COPY).forEach((k) => {
+    const want = STATE_COPY[k];
+    const got = RS.STATE_TEXT[k] || {};
+    eq(got.title, want[0], k + ' 标题逐字');
+    eq(got.sub, want[1], k + ' 副文案逐字');
+    if (k === 'loading') eq(got.slow, want[2], 'loading 慢文案逐字');
+    if (k === 'offline') eq(got.subPanel, want[2], 'offline panel 副文案逐字');
+  });
+
+  /* 页脚三种说法逐字（design §①-d）。三句各自对应一个"这句话是真的吗"的场景：
+   * 离线时写「账号数据读不到」是结果误报（请求根本没发），
+   * 换设备会丢的时候写「已保存到账号」是谎话。 */
+  eq(RS.SOURCE_TEXT.localOnly, '只在这台设备上，换设备会丢', '★ 本机独有那句逐字');
+  eq(RS.SOURCE_TEXT.cloud, '已保存到账号 · 换设备也在', '★ 云端那句逐字');
+  eq(RS.SOURCE_TEXT.degraded, '账号数据暂时读不到，先显示本机战绩', '★★ 降级那句逐字');
+  ok(RS.SOURCE_TEXT.degraded !== RS.SOURCE_TEXT.localOnly,
+    '★★ 降级 ≠ 本机独有（混用会让玩家以为云端那份不存在）');
+
+  /* 撤销条：量词是「局」。这一条守着历史上真实发生过的一次漂移 ——
+   * 视图写「局」、探针等「场」，产品是对的却整段探针全红。 */
+  eq(RS.clearConfirm(2, false), '将清除 2 局战绩（仅本机）', '★★ 撤销条：2 局 + 仅本机');
+  eq(RS.clearConfirm(2, true), '将清除 2 局战绩（含云端）', '★★ 撤销条：勾了云端要说清范围');
+  eq(RS.clearConfirm(0, false), '将清除 全部战绩（仅本机）', '★ 0 局写「全部」，不写「0 局」（假精确）');
+  eq(RS.UNDO_ACTION, '撤销', '★ 撤销按钮文案');
+  ok(!/场/.test(RS.clearConfirm(3, true)), '★★★ 撤销条里不出现「场」量词（一整场对局按「局」计）');
+
+  /* 静态首帧：index.html 里的 [data-rstate-title] / [data-rstate-sub] 是 JS 起来之前
+   * 唯一能显示的字 —— 它只能硬写，但可以**对账**。文案表改了而 HTML 没改时，
+   * 玩家看到的是"先闪一句旧话，再换成新话"，而这正是首屏探针想抓的那一帧。
+   *
+   * 对账按出现顺序做（空 / 加载 / 失败 / 离线 / 榜单），期望值全部取自文案表 ——
+   * 这里**不抄句子**：抄一份就多了一个会忘改的副本，而这条断言的职责恰恰是
+   * "HTML 与表同句"，不是"句子长什么样"。 */
+  const staticPairs = [];
+  const rePair = /data-rstate-(title|sub)>([^<]*)</g;
+  let mPair;
+  while ((mPair = rePair.exec(HTML))) staticPairs.push({ kind: mPair[1], text: mPair[2] });
+  eq(staticPairs.filter((p) => p.kind === 'title').length, 5,
+    '★ 静态首帧正好 5 组标题（空 / 加载 / 失败 / 离线 / 榜单）：' +
+    staticPairs.filter((p) => p.kind === 'title').map((p) => p.text).join(' / '));
+
+  const STATIC_WANT = [
+    ['空态', RS.STATE_TEXT.empty.title, RS.STATE_TEXT.empty.sub],
+    ['加载态', RS.STATE_TEXT.loading.title, RS.STATE_TEXT.loading.sub],
+    ['失败态', RS.ERR['err.net.timeout'].title, RS.ERR['err.net.timeout'].sub],
+    ['离线态', RS.STATE_TEXT.offline.title, RS.STATE_TEXT.offline.sub],
+    ['榜单失败', RS.ERR['err.net.rank'].title, RS.ERR['err.net.rank'].sub]
+  ];
+  STATIC_WANT.forEach((w, i) => {
+    const t = staticPairs[i * 2] || {};
+    const s = staticPairs[i * 2 + 1] || {};
+    eq(t.kind === 'title' ? t.text : '(缺 title 节点)', w[1], '★★ 静态首帧·' + w[0] + ' 标题与文案表同句');
+    eq(s.kind === 'sub' ? s.text : '(缺 sub 节点)', w[2], '★★ 静态首帧·' + w[0] + ' 副文案与文案表同句');
+  });
 }
 
 console.log('\n========================================');

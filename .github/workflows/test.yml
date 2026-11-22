@@ -279,16 +279,10 @@ jobs:
           node scripts/probe-ci.js scripts/probe-first-paint.js 390 844 > /tmp/fp.log 2>&1
           code=$?
           cat /tmp/fp.log
-          # G1 守卫：只看退出码看不出「12 条断言压根没执行」。三项必须同时在日志里。
-          node -e "
-            const t = require('fs').readFileSync('/tmp/fp.log', 'utf8');
-            const need = ['未登录时', '有会话时', '通过 12 项，失败 0 项'];
-            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
-            if (missing.length) {
-              console.error('::error::首屏探针断言没跑全：' + missing.join(' / '));
-              process.exit(3);
-            }
-          "
+          # G1 守卫：只看退出码看不出「断言压根没执行」。段标题与断言条数从
+          # scripts/lib/ci-need.js 取 —— 探针打印的是同一份字符串，这里不再抄中文标题
+          # （抄一份 = 多一个会忘改的副本，这批假红全是这么来的）。
+          node scripts/lib/ci-need.js --verify firstPaint /tmp/fp.log
           self=$?
           if [ $self -ne 0 ]; then exit $self; fi
           if [ $code -ne 0 ]; then
@@ -308,15 +302,7 @@ jobs:
           node scripts/probe-ci.js scripts/probe-big-fx.js 390 844 > /tmp/bfx.log 2>&1
           code=$?
           cat /tmp/bfx.log
-          node -e "
-            const t = require('fs').readFileSync('/tmp/bfx.log', 'utf8');
-            const need = ['只有一组带 is-big', '粒子从组中心出发', '通过 21 项，失败 0 项'];
-            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
-            if (missing.length) {
-              console.error('::error::牌型特写探针断言没跑全：' + missing.join(' / '));
-              process.exit(3);
-            }
-          "
+          node scripts/lib/ci-need.js --verify bigFx /tmp/bfx.log
           self=$?
           if [ $self -ne 0 ]; then exit $self; fi
           if [ $code -ne 0 ]; then
@@ -343,22 +329,10 @@ jobs:
           cat /tmp/u.log
           # 每段都必须**真的跑过**。只核退出码看不出「断言压根没被执行」——
           # 那是 G1 类「写了没接进执行链」。
-          # 用 node 解析而不是 grep：runner 的 C locale 下 grep 匹配不到多字节字符。
-          # ⚠️ 这份清单必须跟着 probe-undo.js 的段标题走。原来的 [6]~[10]
-          # （离开房间撤销条 / 离房广播时序 / 三屏几何）随「离开房间直接退」
-          # 在 312ad8a 一并移除（见 docs/leave-direct-change.md：confirm 弹窗与
-          # 5 秒撤销条整体不做），断言与功能同时消失。清单没跟改，于是每一步都在
-          # 要求一段永远不存在的输出 —— journey job 从那天起必红。
-          node -e "
-            const t = require('fs').readFileSync('/tmp/u.log', 'utf8');
-            const need = ['[1] 打开战绩页', '[2] 确认清除', '[3] 点「撤销」',
-                          '[4] 再确认一次', '[5] 条子隐藏后不占位'];
-            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
-            if (missing.length) {
-              console.error('::error::撤销条断言没跑全：' + missing.join(' / '));
-              process.exit(3);
-            }
-          "
+          # 清单在 scripts/lib/ci-need.js，与探针打印的段标题是**同一份字符串**。
+          # 这里以前抄了一份中文标题，312ad8a 把 [6]~[10] 连功能一起删掉之后
+          # 抄件没跟改 —— journey job 从 11-18 起每一步都在要求一段永远不存在的输出。
+          node scripts/lib/ci-need.js --verify undo /tmp/u.log
           self=$?
           if [ $self -ne 0 ]; then exit $self; fi
           if [ $code -ne 0 ]; then
@@ -371,23 +345,15 @@ jobs:
       # 撤销条 · 320×568：条子压在屏幕下半部，窄屏最容易盖住「返回」按钮，
       # 而那 5 秒恰好是玩家最可能想「算了，先退出去看看」的时候。
       # 只跑 390 会全绿 —— 遮挡是窄屏专有缺陷，必须单跑一档。
-      # need 清单同样跟着 probe-undo.js 的段标题走（[8]~[10] 三屏几何随 312ad8a 移除）。
+      # 同一支探针的窄屏档：段标题与判据复用 undo 那份清单（ci-need 的 undoNarrow
+      # 就是 undo 的别名），不另立一份 —— CI 里它只是独立的一条 check。
       - name: 撤销条 · 320×568（窄屏不遮挡返回 + 全段跑过）
         run: |
           set +e
           node scripts/probe-ci.js scripts/probe-undo.js 320 568 > /tmp/u320.log 2>&1
           code=$?
           cat /tmp/u320.log
-          node -e "
-            const t = require('fs').readFileSync('/tmp/u320.log', 'utf8');
-            const need = ['[1] 打开战绩页', '[2] 确认清除', '[3] 点「撤销」',
-                          '[4] 再确认一次', '[5] 条子隐藏后不占位', '零重叠'];
-            const missing = need.filter(function(s){ return t.indexOf(s) < 0; });
-            if (missing.length) {
-              console.error('::error::320 档断言没跑全：' + missing.join(' / '));
-              process.exit(3);
-            }
-          "
+          node scripts/lib/ci-need.js --verify undoNarrow /tmp/u320.log
           self=$?
           if [ $self -ne 0 ]; then exit $self; fi
           if [ $code -ne 0 ]; then

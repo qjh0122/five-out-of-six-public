@@ -24,6 +24,12 @@
  *      玩家不需要知道 → 静默（只上报，页面一个像素都不动）。
  *   ③ 文案逐字来自 `docs/design-states-v1.md §②-b`，**不许改字**。
  *      施工单允许在 14/26 字内自选，但表里已经是定稿，改字要走设计师。
+ *      推论：**这一屏的句子只在这个文件里有一份**。视图拼句子要从这里取，
+ *      探针与单测断言也要从这里取（`STATE_TEXT` / `SOURCE_TEXT` / `clearConfirm`）。
+ *      道理和 `scripts/public-exclude.txt` 一样 —— 同一个事实抄两份，改的那天
+ *      必有一份忘改。战绩页已经为此吃过两次亏：一次是「场/局」量词，
+ *      一次是「先把这台设备上的记录给你看」收短成「先把本机战绩给你看」，
+ *      两次都是产品对了、副本没跟，红在探针上。
  *
  * 浏览器全局：`window.LXW.recordsState`；Node 里 `module.exports` 直接可用。
  */
@@ -72,6 +78,30 @@
       subPanel: '连上网就能看到账号里的记录'
     }
   };
+
+  /* 页脚「这一份存在哪儿」那一行的三种说法（recordsView.renderSourceLine）。
+   *
+   * 为什么放在文案表里而不是视图里现拼：这一行是「这句话是真的吗」的守卫对象 ——
+   * 离线时写「账号数据暂时读不到」是结果误报（根本没发请求），换设备会丢的时候
+   * 写「已保存到账号」是谎话。每一句都有对应的探针断言，句子写两份就会漂。 */
+  var SOURCE_TEXT = {
+    /* 本机独有（离线 / 没登录账号）：说清楚"离开这台设备就没了" */
+    localOnly: '只在这台设备上，换设备会丢',
+    /* 云端为准：可以放心换设备 */
+    cloud: '已保存到账号 · 换设备也在',
+    /* 在线但云端读失败、本机还有数据：降级，说清是"暂时" */
+    degraded: '账号数据暂时读不到，先显示本机战绩'
+  };
+
+  /* 清除战绩 · 撤销条上的两句话（v136）。
+   *
+   * 量词是「局」：一整场对局 = 一局，与战绩行、AI 说明行同一套口径。
+   * 这里原先在视图里现拼，探针那边照着抄了一遍正则 —— 有人把视图改成「局」，
+   * 探针还在等「场」，于是每条都红而产品是对的。现在两边都从这里取。 */
+  var UNDO_ACTION = '撤销';
+  function clearConfirm(n, withCloud) {
+    return '将清除 ' + (n > 0 ? n + ' 局' : '全部') + '战绩' + (withCloud ? '（含云端）' : '（仅本机）');
+  }
 
   /* 错误三级 + 文案（design §②-a 的 11 个 key，一个不多一个不少）。
    *
@@ -274,6 +304,9 @@
     STATE_SLOW_MS: STATE_SLOW_MS,
     STATES: STATES,
     STATE_TEXT: STATE_TEXT,
+    SOURCE_TEXT: SOURCE_TEXT,
+    UNDO_ACTION: UNDO_ACTION,
+    clearConfirm: clearConfirm,
     ERR: ERR,
     errClassOf: errClassOf,
     recordsStateOf: recordsStateOf,

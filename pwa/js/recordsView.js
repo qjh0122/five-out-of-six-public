@@ -48,7 +48,8 @@
     /* 「5 秒内可以反悔」条（v136）。可以没有 —— 单测/旧缓存里拿不到就是 null，
      * 那种情况下退回"立刻清除"，行为与 v135 一致，不会静默不删。 */
     var undoBar = deps.undoBar || null;
-    /* 打开清除确认框时记下的场次数，给「将清除 N 场」用（v136）。 */
+    /* 打开清除确认框时记下的局数，给撤销条的「将清除 N 局」用（v136）。
+     * 句子本身由 recordsState.clearConfirm() 生成，这里只留数字。 */
     var clearCount = 0;
 
   /* 结束原因的玩家侧措辞。三条必须在同一层级上，别一条一个说法：
@@ -178,6 +179,10 @@
    * 却被告知没网。这是全站唯一的双显豁免，别处不得再开口子。
    */
   var RS = deps.recordsState || (global.LXW && global.LXW.recordsState) || null;
+  /* 句子一律从文案表取（recordsState.js 的 SOURCE_TEXT / clearConfirm）。
+   * 旧缓存里没有 recordsState.js 时这里是空表 —— 页脚那行就留空，
+   * **不在这里留一份兜底句子**：兜底句一旦写成第二份，改文案那天必然漏改。 */
+  var SRC = (RS && RS.SOURCE_TEXT) || {};
   var cloudRecordsErrKey = '';   // 失败原因对应的 ERR 表键（比一句中文可判、可分级）
   var cloudStatus = 0;           // 最近一次失败的服务端状态码（429 要单独一句话）
   var recordsHasData = false;    // 上次渲染时"确实有内容"（降级重试与上报口径都要它）
@@ -729,12 +734,13 @@
        * 也不能沿用横条那句「先把这台设备上的记录给你看」：同一屏同一句话说两遍，
        * 玩家会以为漏了什么。所以这一屏的页脚只说"这一份存在哪儿"。 */
       var text;
-      if (!onlineNow) text = '只在这台设备上，换设备会丢';
+      if (!onlineNow) text = SRC.localOnly;
       else if (cloudRecordsErrKey === 'err.data.malformed') text = errText('err.data.malformed').sub;
-      else if (useCloud) text = '已保存到账号 · 换设备也在';
-      else if (cloudRecordsErr && cloudRecordsReady()) text = '账号数据暂时读不到，先显示本机战绩';
-      else text = '只在这台设备上，换设备会丢';
-      src.textContent = text;
+      else if (useCloud) text = SRC.cloud;
+      else if (cloudRecordsErr && cloudRecordsReady()) text = SRC.degraded;
+      else text = SRC.localOnly;
+      /* 空串也要写（旧缓存没有文案表时把上一轮的字擦掉，而不是留着它冒充现状） */
+      src.textContent = text || '';
     }
     var retry = $('#records-source-retry');
     if (!retry) return;
@@ -1864,16 +1870,18 @@
       }).catch(function () { finish(false, '没连上服务器，战绩还在本机；回战绩页再点一次「清除战绩」'); });
     }
 
-    /* 没有撤销条 = 老行为：立刻清。宁可清掉也不能点了没反应。 */
-    if (!undoBar) { doClear('no-bar'); return; }
+    /* 没有撤销条 = 老行为：立刻清。宁可清掉也不能点了没反应。
+     * 旧缓存里连文案表都没有（拿不到那句「将清除 N 局」）时也走这条：
+     * 少一个提示 ≠ 取消这个动作。 */
+    if (!undoBar || !(RS && RS.clearConfirm)) { doClear('no-bar'); return; }
 
     /* 延迟执行，而不是"先删再回滚"。
      * 云端那一步没有逆操作（resetMyStats 清零之后没有任何接口写得回去），
      * 所谓"撤销"只能恢复本机，排行榜上已经空了 —— 那种假撤销比不给更坏。
      * 详情见 pwa/js/undoBar.js 顶部的注释。 */
     undoBar.show({
-      msg: '将清除 ' + (n > 0 ? n + ' 局' : '全部') + '战绩' + (withCloud ? '（含云端）' : '（仅本机）'),
-      action: '撤销',
+      msg: RS.clearConfirm(n, withCloud),
+      action: RS.UNDO_ACTION,
       seconds: 5,
       onUndo: function () {
         flash('已取消，战绩还在');
