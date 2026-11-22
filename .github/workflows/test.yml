@@ -17,6 +17,12 @@ on:
 
 jobs:
   test:
+    # ★ 私有库的 Actions 额度已用尽（每次推送 6 个 job 全部 steps=0 直接 failure，
+    # 日志是 22 字节空包）。那不是代码问题，但会在每次 push 上留一个红叉 ——
+    # 久了就养成「红叉不用看」的习惯，而真正的红就埋在里头。
+    # 公库是同一份快照、免费额度充足，所以：私有库跳过，公库照跑。
+    # 判据用 repository.private 而不是仓库名：改名/迁移都不用动这里。
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -124,6 +130,12 @@ jobs:
   #     混在一起切，一片里三族各坏一条反而看不出规律。
   # ────────────────────────────────────────────────────────────────────
   ui-probe:
+    # ★ 私有库的 Actions 额度已用尽（每次推送 6 个 job 全部 steps=0 直接 failure，
+    # 日志是 22 字节空包）。那不是代码问题，但会在每次 push 上留一个红叉 ——
+    # 久了就养成「红叉不用看」的习惯，而真正的红就埋在里头。
+    # 公库是同一份快照、免费额度充足，所以：私有库跳过，公库照跑。
+    # 判据用 repository.private 而不是仓库名：改名/迁移都不用动这里。
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -212,6 +224,12 @@ jobs:
   # 它本来就只需要一个浏览器，和分片无关。
   # ────────────────────────────────────────────────────────────────────
   journey:
+    # ★ 私有库的 Actions 额度已用尽（每次推送 6 个 job 全部 steps=0 直接 failure，
+    # 日志是 22 字节空包）。那不是代码问题，但会在每次 push 上留一个红叉 ——
+    # 久了就养成「红叉不用看」的习惯，而真正的红就埋在里头。
+    # 公库是同一份快照、免费额度充足，所以：私有库跳过，公库照跑。
+    # 判据用 repository.private 而不是仓库名：改名/迁移都不用动这里。
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
