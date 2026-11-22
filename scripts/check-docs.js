@@ -31,6 +31,32 @@ const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
+/* =================== 公开库剔除清单（单一事实来源）===================
+ * 清单 scripts/public-exclude.txt 由 scripts/publish-public.sh 读取执行删除，
+ * 这里读**同一份**。为什么必须同源：导出时删掉了 docs/review 与 repo-public-plan.md，
+ * 而本守却要求 INDEX 里指向它们的链接必须存在 —— 公库 CI 从 2026-11-18 起每次必红
+ * （19 条死链），私库全绿。不是谁写错了，是同一个事实被抄了两份。
+ *
+ * 判据只在「该条目在本机**整体不存在**」时生效：那才是「已按公开库剔除」的证据。
+ * 条目存在就不豁免 —— 私库里 docs/review 在，INDEX 写错一个文件名照样会红。
+ * 所以这不是「文件不在就放过」的后门。
+ */
+function toPattern(item) {
+  const parts = item.split('*').map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp('^' + parts.join('[^/]*') + '(/|$)');
+}
+const EXCLUDED = (() => {
+  const f = path.join(ROOT, 'scripts/public-exclude.txt');
+  if (!fs.existsSync(f)) return [];
+  return fs.readFileSync(f, 'utf8').split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith('#'))
+    .map((s) => s.replace(/\/+$/, ''))
+    .filter((s) => !fs.existsSync(path.join(ROOT, s)))   /* 整体不存在才算已剔除 */
+    .map((s) => ({ raw: s, re: toPattern(s) }));
+})();
+const isPublicExcluded = (rel) => EXCLUDED.some((e) => e.re.test(rel));
+
 /* 文档链接（允许 #锚点）。自测与正式检查**必须共用这一个正则** ——
  * 各写一份的话，自测绿了也证明不了正式检查不漏。 */
 const LINK_RE = /\]\((\.\.?\/[^)#]+\.md)(?:#[^)]*)?\)/g;
@@ -107,21 +133,37 @@ head('[1] INDEX 登记的文档链接');
   const index = read('docs/INDEX.md');
   const links = [...index.matchAll(LINK_RE)].map((m) => m[1]);
   const missing = links.filter((l) => !exists(path.join('docs', l)));
+  /* 公库里指向「被剔除文档」的链接不算死链（清单见 scripts/public-exclude.txt）。
+   * 只在剔除项整体不存在时豁免，所以私库的严格度不变。 */
+  const skipped = missing.filter((l) => isPublicExcluded(path.posix.normalize('docs/' + l.replace(/^\.\//, ''))));
+  const dead = missing.filter((l) => skipped.indexOf(l) < 0);
   ok(links.length >= 40, '真的扫到了文档链接（' + links.length + ' 条）');
-  eq(missing.length, 0, '★★ 死链为 0', missing.join(', '));
+  if (skipped.length) {
+    ok(true, '跳过 ' + skipped.length + ' 条指向公开库剔除项的链接（'
+      + EXCLUDED.map((e) => e.raw).join(', ') + '）');
+  }
+  eq(dead.length, 0, '★★ 死链为 0', dead.join(', '));
 }
 
 /* =================== [1b] review 档案登记完整性 =================== */
 head('[1b] review/ 下每份档案都在 INDEX 登记（QA 审计 D11）');
 {
-  const idx = fs.readFileSync(path.join(ROOT, 'docs/INDEX.md'), 'utf8');
-  const linked = new Set([...idx.matchAll(/\]\(\.\/review\/([^)#]+\.md)(?:#[^)]*)?\)/g)].map((m) => m[1]));
-  const actual = fs.readdirSync(path.join(ROOT, 'docs/review')).filter((f) => f.endsWith('.md'));
-  const miss = actual.filter((f) => !linked.has(f));
-  const dead = [...linked].filter((f) => !actual.includes(f));
-  ok(actual.length >= 15, '真的扫到了 review 档案（' + actual.length + ' 份）');
-  eq(miss.length, 0, '★ 没有漏登记的档案', miss.join(', '));
-  eq(dead.length, 0, '★ 没有指向不存在档案的链接', dead.join(', '));
+  const reviewDir = path.join(ROOT, 'docs/review');
+  if (!fs.existsSync(reviewDir)) {
+    /* 公开库按 scripts/public-exclude.txt 整体剔除 docs/review。
+     * 目录都不在，核对「档案是否登记」既无对象也不该报错 —— 明说跳过，
+     * 不静默消失（否则下次没人知道这条判据有没有被执行过）。 */
+    ok(true, 'docs/review 不在本机（公开库已剔除）→ 跳过档案登记核对');
+  } else {
+    const idx = fs.readFileSync(path.join(ROOT, 'docs/INDEX.md'), 'utf8');
+    const linked = new Set([...idx.matchAll(/\]\(\.\/review\/([^)#]+\.md)(?:#[^)]*)?\)/g)].map((m) => m[1]));
+    const actual = fs.readdirSync(reviewDir).filter((f) => f.endsWith('.md'));
+    const miss = actual.filter((f) => !linked.has(f));
+    const dead = [...linked].filter((f) => !actual.includes(f));
+    ok(actual.length >= 15, '真的扫到了 review 档案（' + actual.length + ' 份）');
+    eq(miss.length, 0, '★ 没有漏登记的档案', miss.join(', '));
+    eq(dead.length, 0, '★ 没有指向不存在档案的链接', dead.join(', '));
+  }
 }
 
 /* =================== [2] 唯一事实源：当前状态卡片 =================== */
